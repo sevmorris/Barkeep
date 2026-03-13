@@ -12,6 +12,7 @@
 		111083731762891F4CBE61CB /* BrewPackage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52E00817C58F1894743F7457 /* BrewPackage.swift */; };
 		16241970A2061C114A899AC1 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076800E1FB5750216D1A8DAF /* AppState.swift */; };
 		18449CDD354A213D6473C885 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C4DBCC4A9E95E0E7A26FC429 /* Assets.xcassets */; };
+		29203C0BDBE982577FC7204F /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 830CF38139D96D05EA9DDD57 /* UpdateChecker.swift */; };
 		3230E86FAA863D041E311B68 /* BarkeepApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 323079A45F04FAB3BF147CEA /* BarkeepApp.swift */; };
 		32A2BC67E0B737F5DF997527 /* ActionPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A5401537BB31A8BE2B168D9 /* ActionPanelView.swift */; };
 		5096AED61DD9B180B69000C5 /* BrewfilePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BBFAF6524FF818F342A190D /* BrewfilePickerView.swift */; };
@@ -43,6 +44,7 @@
 		64EC84129F800151C641CF65 /* InstalledListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstalledListView.swift; sourceTree = "<group>"; };
 		7438683DB48E09178234F9D8 /* BrewfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrewfileViewModel.swift; sourceTree = "<group>"; };
 		785D7B9CE182339A802885A4 /* InstalledViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstalledViewModel.swift; sourceTree = "<group>"; };
+		830CF38139D96D05EA9DDD57 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		833646D9558C3A46E65734BA /* ConsoleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsoleView.swift; sourceTree = "<group>"; };
 		85BDDD39E42E960B6477CCE2 /* BrewRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrewRunner.swift; sourceTree = "<group>"; };
 		931256894C98A3CBEA8C9F0F /* ProcessingLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessingLog.swift; sourceTree = "<group>"; };
@@ -60,6 +62,7 @@
 			children = (
 				A853DBC4A3DD73EF8283177D /* BrewfileParser.swift */,
 				85BDDD39E42E960B6477CCE2 /* BrewRunner.swift */,
+				830CF38139D96D05EA9DDD57 /* UpdateChecker.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -220,6 +223,7 @@
 				7C2B7BEC58E60A5D41476D56 /* PackageRowView.swift in Sources */,
 				74544E787FE740FDD40A3E36 /* ProcessingLog.swift in Sources */,
 				5240236D547818EFE4C33927 /* RootContentView.swift in Sources */,
+				29203C0BDBE982577FC7204F /* UpdateChecker.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

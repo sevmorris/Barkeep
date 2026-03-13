@@ -9,6 +9,10 @@ struct BarkeepApp: App {
         WindowGroup {
             RootContentView()
                 .environment(appState)
+                .task {
+                    try? await Task.sleep(for: .seconds(2))
+                    appState.availableUpdate = await UpdateChecker.shared.checkForUpdate()
+                }
         }
         .commands {
             CommandGroup(replacing: .help) {

@@ -105,6 +105,18 @@ struct RootContentView: View {
                     .foregroundStyle(.orange)
             }
 
+            if let update = appState.availableUpdate {
+                Button {
+                    NSWorkspace.shared.open(update.downloadURL)
+                } label: {
+                    Label("Barkeep \(update.version) available", systemImage: "arrow.down.circle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.blue)
+                }
+                .buttonStyle(.plain)
+                .help("Open GitHub releases page")
+            }
+
             if isRunning {
                 Button {
                     Task { await BrewRunner.shared.cancel() }

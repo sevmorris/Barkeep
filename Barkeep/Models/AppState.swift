@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 final class AppState {
     var showBrewfilePicker = false
+    var availableUpdate: AvailableUpdate? = nil
 
     var brewfilePath: URL? {
         didSet {
