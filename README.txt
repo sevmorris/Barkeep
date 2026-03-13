@@ -15,12 +15,13 @@ ABOUT
 
 Barkeep is a native macOS app for managing Homebrew packages.
 
-Browse your installed packages, manage your Brewfile, and run brew
+Browse and manage your Brewfile, view package details, and run brew
 commands — all from a clean three-column interface.
 
-Brewfile view — list tracked packages grouped by section; add/remove entries.
-Installed view — brew list output with sync diff highlighting.
+Brewfile view — packages grouped by section with inline search; select
+any package to see description, version, dependencies, examples, and more.
 Console — streaming brew command output.
+Actions — install, uninstall, upgrade, or remove from Brewfile.
 
 Defaults to ~/mrk/Brewfile; any Brewfile location can be selected.
 

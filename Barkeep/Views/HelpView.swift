@@ -21,7 +21,7 @@ struct HelpView: View {
 
                 section("Package Details") {
                     text("Displayed when a package is selected. Fetched on demand from Homebrew and supplemental sources.")
-                    definition("Stats grid",        as: "Type, version, license, section, tap, and install date")
+                    definition("Stats grid",        as: "Type, Brewfile membership, version, license, section, tap, and install date")
                     definition("Description",       as: "Package description from Homebrew")
                     definition("Caveats",           as: "Post-install notes from the formula")
                     definition("Dependencies",      as: "Runtime and build dependencies")
@@ -48,7 +48,7 @@ struct HelpView: View {
                     definition("Filename + path", as: "The currently active Brewfile")
                     definition("N updates",       as: "Number of installed packages with available updates")
                     definition("⏹  Stop",         as: "Cancel a running brew command (visible while running)")
-                    definition("⌥  Console",      as: "Toggle the output console")
+                    definition("Terminal icon",    as: "Toggle the output console")
                     definition("⟳  Refresh",      as: "Reload the Brewfile and re-check for updates")
                     definition("📁  Folder",       as: "Change the active Brewfile")
                 }

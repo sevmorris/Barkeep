@@ -1,6 +1,6 @@
 **Homebrew Manager for macOS**
 
-Barkeep is a native macOS app for managing Homebrew packages. Browse your installed packages, manage your Brewfile, and run brew commands — all from a clean three-column interface.
+Barkeep is a native macOS app for managing Homebrew packages. Browse and manage your Brewfile, view package details, and run brew commands — all from a clean three-column interface.
 
 **[Download v1.0 (DMG)](https://github.com/sevmorris/Barkeep/releases/latest/download/Barkeep-v1.0.dmg)**
 
@@ -16,9 +16,9 @@ Barkeep is a native macOS app for managing Homebrew packages. Browse your instal
 
 ## Features
 
-- **Brewfile view** — list tracked packages grouped by section; add/remove entries
-- **Installed view** — full `brew list` output with sync diff highlighting (packages not in your Brewfile)
+- **Brewfile view** — packages grouped by section with inline search; select any to see description, version, dependencies, examples, man page, and more
 - **Console** — streaming brew command output
+- **Actions** — install, uninstall, upgrade, or remove from Brewfile for any selected package
 - Defaults to `~/mrk/Brewfile`; any Brewfile location can be selected
 
 ## Companion App
