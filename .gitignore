@@ -1,0 +1,18 @@
+# Xcode
+build/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+xcuserdata/
+DerivedData/
+*.moved-aside
+*.hmap
+*.ipa
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Temp
+*.tmp
