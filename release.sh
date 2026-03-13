@@ -130,9 +130,13 @@ ok "DMG contains $DMG_VERSION"
 step "Updating README download link"
 sed -i '' "s|Barkeep-v[0-9][0-9.]*\.dmg|Barkeep-${TAG}.dmg|g" README.md
 sed -i '' "s|Download v[0-9][0-9.]*|Download ${TAG}|g" README.md
-git add README.md
-git commit -m "docs: update download link to ${TAG}"
-ok "README points to ${TAG}"
+if [[ -n "$(git diff README.md)" ]]; then
+    git add README.md
+    git commit -m "docs: update download link to ${TAG}"
+    ok "README updated to ${TAG}"
+else
+    ok "README already points to ${TAG} — skipping commit"
+fi
 
 # ── Tag and push ──────────────────────────────────────────────────────────────
 step "Tagging and pushing"
