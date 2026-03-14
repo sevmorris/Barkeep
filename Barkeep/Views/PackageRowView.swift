@@ -41,25 +41,43 @@ struct PackageRowView: View {
 
 // MARK: - Shared helpers for list views
 
-func filterBar(text: Binding<String>) -> some View {
-    HStack {
-        Image(systemName: "magnifyingglass")
-            .foregroundStyle(.tertiary)
-            .font(.caption)
-        TextField("Filter", text: text)
-            .textFieldStyle(.plain)
-            .font(.body)
-        if !text.wrappedValue.isEmpty {
-            Button { text.wrappedValue = "" } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.tertiary)
+struct FilterBar: View {
+    @Binding var text: String
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.tertiary)
+                .font(.caption)
+            TextField("Filter", text: $text)
+                .textFieldStyle(.plain)
+                .font(.body)
+                .focused($isFocused)
+            if !text.isEmpty {
+                Button { text = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(.background.opacity(0.5))
+        .background {
+            // Hidden button to capture ⌘F and focus the filter field
+            Button("") { isFocused = true }
+                .keyboardShortcut("f", modifiers: .command)
+                .frame(width: 0, height: 0)
+                .opacity(0)
         }
     }
-    .padding(.horizontal, 10)
-    .padding(.vertical, 7)
-    .background(.background.opacity(0.5))
+}
+
+/// Backwards-compatible wrapper
+func filterBar(text: Binding<String>) -> some View {
+    FilterBar(text: text)
 }
 
 func emptyLabel(_ text: String) -> some View {

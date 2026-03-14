@@ -1,25 +1,28 @@
 import SwiftUI
 
 struct PackageDetailView: View {
-    let name: String
-    let kind: PackageKind
-    var description: String = ""
-    var version: String = ""
-    var homepage: String = ""
-    var section: String = ""
-    var isInBrewfile: Bool = true
-    var license: String = ""
-    var tap: String = ""
-    var dependencies: [String] = []
-    var buildDependencies: [String] = []
-    var caveats: String = ""
-    var outdated: Bool = false
-    var conflicts: [String] = []
-    var tldrSummary: String = ""
-    var tldrExamples: [TldrExample] = []
-    var manSections: [ManSection] = []
-    var reverseDependencies: [String] = []
-    var installDate: Date? = nil
+    let package: BrewPackage
+
+    // Convenience accessors
+    private var name: String { package.name }
+    private var kind: PackageKind { package.kind }
+    private var description: String { package.description }
+    private var version: String { package.version }
+    private var homepage: String { package.homepage }
+    private var section: String { package.brewfileSection ?? "" }
+    private var isInBrewfile: Bool { package.isInBrewfile }
+    private var license: String { package.license }
+    private var tap: String { package.tap }
+    private var dependencies: [String] { package.dependencies }
+    private var buildDependencies: [String] { package.buildDependencies }
+    private var caveats: String { package.caveats }
+    private var outdated: Bool { package.outdated }
+    private var conflicts: [String] { package.conflicts }
+    private var tldrSummary: String { package.tldrSummary }
+    private var tldrExamples: [TldrExample] { package.tldr }
+    private var manSections: [ManSection] { package.manSections }
+    private var reverseDependencies: [String] { package.reverseDependencies }
+    private var installDate: Date? { package.installDate }
 
     var body: some View {
         ScrollView {

@@ -124,6 +124,7 @@ actor BrewRunner {
             process.standardOutput = outPipe
             process.standardError = errPipe
 
+            nonisolated(unsafe) var resumed = false
             nonisolated(unsafe) var stderrData = Data()
             errPipe.fileHandleForReading.readabilityHandler = { handle in
                 stderrData.append(handle.availableData)
@@ -131,6 +132,8 @@ actor BrewRunner {
 
             process.terminationHandler = { p in
                 errPipe.fileHandleForReading.readabilityHandler = nil
+                guard !resumed else { return }
+                resumed = true
                 let data = outPipe.fileHandleForReading.readDataToEndOfFile()
                 if p.terminationStatus == 0 {
                     continuation.resume(returning: String(data: data, encoding: .utf8) ?? "")
@@ -144,6 +147,8 @@ actor BrewRunner {
             do {
                 try process.run()
             } catch {
+                guard !resumed else { return }
+                resumed = true
                 continuation.resume(throwing: error)
             }
         }
@@ -263,7 +268,7 @@ actor BrewRunner {
     /// Returns empty array for casks or when no man page exists.
     func manPage(for name: String) async -> [ManSection] {
         guard let raw = try? await captureRaw("/bin/bash",
-            args: ["-c", "MANPAGER=cat man \(name) 2>/dev/null | col -b"]),
+            args: ["-c", "MANPAGER=cat man -- \"$1\" 2>/dev/null | col -b", "bash", name]),
               !raw.isEmpty
         else { return [] }
         return parseManPage(raw)
@@ -334,7 +339,7 @@ actor BrewRunner {
         // Resolve `tldr` via PATH if needed
         let execPath: String
         if tldrPath == "tldr" {
-            execPath = (try? await capture(["which", "tldr"])) ?? ""
+            execPath = (try? await captureRaw("/usr/bin/which", args: ["tldr"])) ?? ""
         } else {
             execPath = tldrPath
         }

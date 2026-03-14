@@ -12,7 +12,7 @@ struct LogEntry: Identifiable {
     let level: LogLevel
 }
 
-@Observable
+@MainActor @Observable
 final class ProcessingLog {
     var entries: [LogEntry] = []
 

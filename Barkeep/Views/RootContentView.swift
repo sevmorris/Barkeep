@@ -172,27 +172,15 @@ struct RootContentView: View {
         fallbackKind: PackageKind = .formula,
         section: String = ""
     ) -> some View {
-        PackageDetailView(
-            name:              pkg?.name              ?? fallbackName,
-            kind:              pkg?.kind              ?? fallbackKind,
-            description:       pkg?.description       ?? "",
-            version:           pkg?.version           ?? "",
-            homepage:          pkg?.homepage          ?? "",
-            section:           pkg?.brewfileSection   ?? section,
-            isInBrewfile:      true,
-            license:           pkg?.license           ?? "",
-            tap:               pkg?.tap               ?? "",
-            dependencies:      pkg?.dependencies      ?? [],
-            buildDependencies: pkg?.buildDependencies ?? [],
-            caveats:           pkg?.caveats           ?? "",
-            outdated:          pkg?.outdated ?? brewfileVM.outdatedNames.contains(pkg?.name ?? fallbackName),
-            conflicts:         pkg?.conflicts         ?? [],
-            tldrSummary:       pkg?.tldrSummary       ?? "",
-            tldrExamples:         pkg?.tldr                ?? [],
-            manSections:          pkg?.manSections          ?? [],
-            reverseDependencies:  pkg?.reverseDependencies  ?? [],
-            installDate:          pkg?.installDate
-        )
+        let resolved = pkg ?? BrewPackage(name: fallbackName, kind: fallbackKind)
+        let display = {
+            var p = resolved
+            p.isInBrewfile = true
+            if p.brewfileSection == nil { p.brewfileSection = section }
+            if !p.outdated { p.outdated = brewfileVM.outdatedNames.contains(p.name) }
+            return p
+        }()
+        PackageDetailView(package: display)
     }
 
     // MARK: - Helpers
