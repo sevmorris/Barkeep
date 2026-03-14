@@ -34,7 +34,7 @@ struct ActionPanelView: View {
                             if !detail.isBrewManaged && entry.kind == .cask {
                                 // App exists in /Applications but brew doesn't track it
                                 actionButton("Adopt", icon: "square.and.arrow.down.on.square", tint: .blue) {
-                                    Task { await runBrew(["install", "--adopt", "--cask", entry.name]) }
+                                    Task { await adoptCask(entry.name) }
                                 }
                             }
 
@@ -119,6 +119,41 @@ struct ActionPanelView: View {
             onError(error.localizedDescription)
         }
 
+        isRunning = false
+    }
+
+    /// Try --adopt first; if versions mismatch, fall back to --force install.
+    private func adoptCask(_ name: String) async {
+        guard !isRunning else { return }
+        isRunning = true
+        log.clear()
+        log.append("$ brew install --adopt --cask \(name)")
+
+        do {
+            try await BrewRunner.shared.run(["install", "--adopt", "--cask", name]) { @MainActor line, level in
+                log.append(line, level: level)
+            }
+            log.append("Done — adopted successfully.")
+        } catch {
+            // Adopt failed (likely version mismatch) — retry with --force
+            log.append("Adopt failed, upgrading with --force…", level: .verbose)
+            log.append("$ brew install --force --cask \(name)")
+            do {
+                try await BrewRunner.shared.run(["install", "--force", "--cask", name]) { @MainActor line, level in
+                    log.append(line, level: level)
+                }
+                log.append("Done — installed and now managed by brew.")
+            } catch {
+                log.append("Error: \(error.localizedDescription)", level: .error)
+                onError(error.localizedDescription)
+            }
+        }
+
+        brewfileVM.outdatedNames = await BrewRunner.shared.outdatedNames()
+        // Reload detail so isBrewManaged updates
+        if let entry = brewfileVM.selectedEntry {
+            Task { await brewfileVM.loadDetail(for: entry) }
+        }
         isRunning = false
     }
 }
