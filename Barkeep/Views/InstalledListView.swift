@@ -2,6 +2,7 @@ import SwiftUI
 
 struct InstalledListView: View {
     @Bindable var vm: InstalledViewModel
+    var outdatedNames: Set<String> = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -33,6 +34,7 @@ struct InstalledListView: View {
                         Section("Formulae (\(vm.filteredFormulae.count))") {
                             ForEach(vm.filteredFormulae) { pkg in
                                 PackageRowView(name: pkg.name, kind: pkg.kind,
+                                               hasUpdate: outdatedNames.contains(pkg.name),
                                                untracked: !pkg.isInBrewfile)
                                     .tag(pkg.id)
                             }
@@ -42,6 +44,7 @@ struct InstalledListView: View {
                         Section("Casks (\(vm.filteredCasks.count))") {
                             ForEach(vm.filteredCasks) { pkg in
                                 PackageRowView(name: pkg.name, kind: pkg.kind,
+                                               hasUpdate: outdatedNames.contains(pkg.name),
                                                untracked: !pkg.isInBrewfile)
                                     .tag(pkg.id)
                             }

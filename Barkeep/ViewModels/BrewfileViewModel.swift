@@ -47,7 +47,11 @@ final class BrewfileViewModel {
             self.error = error.localizedDescription
         }
         isLoading = false
-        Task { outdatedNames = await BrewRunner.shared.outdatedNames() }
+        Task {
+            let allOutdated = await BrewRunner.shared.outdatedNames()
+            let brewfileNames = Set(allEntries.map(\.name))
+            outdatedNames = allOutdated.intersection(brewfileNames)
+        }
     }
 
     // MARK: - On-demand detail
