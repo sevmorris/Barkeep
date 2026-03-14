@@ -346,6 +346,9 @@ actor BrewRunner {
         for url in contents {
             guard url.pathExtension == "app" else { continue }
 
+            // Skip Mac App Store apps (they have a _MASReceipt inside the bundle)
+            if fm.fileExists(atPath: url.appendingPathComponent("Contents/_MASReceipt").path) { continue }
+
             let appName = url.deletingPathExtension().lastPathComponent
             let normalized = Self.normalizeCaskToken(appName)
             guard !normalized.isEmpty else { continue }
