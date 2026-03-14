@@ -298,15 +298,35 @@ actor BrewRunner {
             allCaskTokens = tokens
         }
 
-        // 2. Get currently installed casks
+        // 2. Get currently installed casks and the app names they provide
         progress?("Checking installed casks…")
         let installedCasks: Set<String>
+        var installedAppNames = Set<String>()  // normalized app names from installed casks
         if let installedRaw = try? await capture(["list", "--cask"]) {
-            installedCasks = Set(
-                installedRaw.components(separatedBy: "\n")
-                    .map { $0.trimmingCharacters(in: .whitespaces) }
-                    .filter { !$0.isEmpty }
-            )
+            let tokens = installedRaw.components(separatedBy: "\n")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            installedCasks = Set(tokens)
+            // Single bulk call to get app artifacts for all installed casks
+            // (handles name mismatches like helium-browser installing Helium.app)
+            if !tokens.isEmpty,
+               let infoRaw = try? await capture(["info", "--cask", "--json=v2"] + tokens),
+               let data = infoRaw.data(using: .utf8),
+               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let casks = root["casks"] as? [[String: Any]] {
+                for cask in casks {
+                    if let artifacts = cask["artifacts"] as? [[String: Any]] {
+                        for artifact in artifacts {
+                            if let apps = artifact["app"] as? [String] {
+                                for app in apps {
+                                    let name = app.replacingOccurrences(of: ".app", with: "")
+                                    installedAppNames.insert(Self.normalizeCaskToken(name))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         } else {
             installedCasks = []
         }
@@ -336,8 +356,9 @@ actor BrewRunner {
             // Skip if already in Brewfile
             guard !brewfileEntries.contains(normalized) else { continue }
 
-            // Skip if already installed as a cask
-            guard !installedCasks.contains(normalized) else { continue }
+            // Skip if already installed as a cask (by token or by app name)
+            guard !installedCasks.contains(normalized),
+                  !installedAppNames.contains(normalized) else { continue }
 
             results.append(MigratableApp(appName: appName, caskToken: normalized))
         }
@@ -346,11 +367,12 @@ actor BrewRunner {
     }
 
     /// Normalize an app name to a cask token: lowercase, hyphens for spaces, strip special chars.
+    /// Keeps `+` and `@` which are valid in cask tokens (e.g. 4k-video-downloader+, node@22).
     private static func normalizeCaskToken(_ appName: String) -> String {
         appName
             .lowercased()
             .replacingOccurrences(of: " ", with: "-")
-            .replacingOccurrences(of: #"[^a-z0-9\-]"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"[^a-z0-9\-+@]"#, with: "", options: .regularExpression)
     }
 
     // MARK: - Man page
