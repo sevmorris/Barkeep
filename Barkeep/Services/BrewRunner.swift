@@ -213,7 +213,8 @@ actor BrewRunner {
 
                 var pkg = BrewPackage(name: name, kind: .formula,
                                       description: desc, version: version, homepage: home,
-                                      isInstalled: true)
+                                      isInstalled: true,
+                                      isBrewManaged: true)
                 pkg.license          = license
                 pkg.tap              = tap
                 pkg.dependencies     = deps
@@ -256,7 +257,8 @@ actor BrewRunner {
 
                 var pkg = BrewPackage(name: token, kind: .cask,
                                       description: desc, version: version, homepage: home,
-                                      isInstalled: brewInstalled || appInApplications)
+                                      isInstalled: brewInstalled || appInApplications,
+                                      isBrewManaged: brewInstalled)
                 pkg.tap         = tap
                 pkg.caveats     = caveats.trimmingCharacters(in: .whitespacesAndNewlines)
                 pkg.outdated    = outdated

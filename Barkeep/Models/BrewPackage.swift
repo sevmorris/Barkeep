@@ -45,6 +45,7 @@ struct BrewPackage: Identifiable, Hashable {
 
     // State
     var isInstalled: Bool = false
+    var isBrewManaged: Bool = false  // true if brew installed it; false if only found in /Applications
     var isInBrewfile: Bool = false
     var brewfileSection: String? = nil
 

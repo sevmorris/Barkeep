@@ -30,7 +30,14 @@ struct ActionPanelView: View {
                             Divider().padding(.vertical, 2)
                         }
 
-                        if brewfileVM.selectedDetail?.isInstalled == true {
+                        if let detail = brewfileVM.selectedDetail, detail.isInstalled {
+                            if !detail.isBrewManaged && entry.kind == .cask {
+                                // App exists in /Applications but brew doesn't track it
+                                actionButton("Adopt", icon: "square.and.arrow.down.on.square", tint: .blue) {
+                                    Task { await runBrew(["install", "--adopt", "--cask", entry.name]) }
+                                }
+                            }
+
                             actionButton("Reinstall", icon: "arrow.down.circle") {
                                 Task { await runBrew(["reinstall", entry.name]) }
                             }
