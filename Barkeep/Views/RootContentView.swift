@@ -7,6 +7,7 @@ struct RootContentView: View {
     @State private var isRunning   = false
     @State private var showConsole = false
     @State private var alertMessage: String? = nil
+    @State private var showMigrationScan = false
 
     var body: some View {
         @Bindable var appState = appState
@@ -28,6 +29,11 @@ struct RootContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .barkeepRefresh)) { _ in
             if let url = appState.brewfilePath { brewfileVM.load(from: url) }
+        }
+        .sheet(isPresented: $showMigrationScan) {
+            if let url = appState.brewfilePath {
+                MigrationScanView(brewfileVM: brewfileVM, brewfileURL: url)
+            }
         }
         .alert("Error", isPresented: Binding(
             get: { alertMessage != nil },
@@ -130,6 +136,10 @@ struct RootContentView: View {
             toolbarButton(icon: showConsole ? "terminal.fill" : "terminal",
                           active: showConsole, help: "Toggle console") {
                 withAnimation(.easeInOut(duration: 0.2)) { showConsole.toggle() }
+            }
+
+            toolbarButton(icon: "arrow.right.arrow.left.square", help: "Scan for migratable apps") {
+                showMigrationScan = true
             }
 
             toolbarButton(icon: "arrow.clockwise", help: "Refresh") {

@@ -262,6 +262,72 @@ actor BrewRunner {
         return names
     }
 
+    // MARK: - Migratable cask scan
+
+    /// Scan /Applications for .app bundles that match known cask tokens
+    /// but aren't already in the Brewfile or installed as casks.
+    func findMigratableCasks(brewfileEntries: Set<String>) async -> [MigratableApp] {
+        // 1. Get all known cask tokens
+        guard let allCasksRaw = try? await capture(["search", "--cask", ""]) else { return [] }
+        let allCaskTokens = Set(
+            allCasksRaw.components(separatedBy: "\n")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+        )
+
+        // 2. Get currently installed casks
+        let installedCasks: Set<String>
+        if let installedRaw = try? await capture(["list", "--cask"]) {
+            installedCasks = Set(
+                installedRaw.components(separatedBy: "\n")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+            )
+        } else {
+            installedCasks = []
+        }
+
+        // 3. Scan /Applications
+        let fm = FileManager.default
+        let appsURL = URL(fileURLWithPath: "/Applications")
+        guard let contents = try? fm.contentsOfDirectory(
+            at: appsURL,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        var results: [MigratableApp] = []
+
+        for url in contents {
+            guard url.pathExtension == "app" else { continue }
+
+            let appName = url.deletingPathExtension().lastPathComponent
+            let normalized = Self.normalizeCaskToken(appName)
+            guard !normalized.isEmpty else { continue }
+
+            // Check if it's a known cask token
+            guard allCaskTokens.contains(normalized) else { continue }
+
+            // Skip if already in Brewfile
+            guard !brewfileEntries.contains(normalized) else { continue }
+
+            // Skip if already installed as a cask
+            guard !installedCasks.contains(normalized) else { continue }
+
+            results.append(MigratableApp(appName: appName, caskToken: normalized))
+        }
+
+        return results.sorted { $0.appName.localizedCaseInsensitiveCompare($1.appName) == .orderedAscending }
+    }
+
+    /// Normalize an app name to a cask token: lowercase, hyphens for spaces, strip special chars.
+    private static func normalizeCaskToken(_ appName: String) -> String {
+        appName
+            .lowercased()
+            .replacingOccurrences(of: " ", with: "-")
+            .replacingOccurrences(of: #"[^a-z0-9\-]"#, with: "", options: .regularExpression)
+    }
+
     // MARK: - Man page
 
     /// Fetches and parses the man page for a formula, returning key sections.

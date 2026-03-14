@@ -28,6 +28,8 @@
 		EB2358577C5272B402A43C1F /* BrewfileEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB6481A2E615EF61078E7A9D /* BrewfileEntry.swift */; };
 		F2069600C7982A1AD7D7084B /* BrewfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7438683DB48E09178234F9D8 /* BrewfileViewModel.swift */; };
 		F4C2F27C403B7AB90BDB5AF0 /* BrewfileParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A853DBC4A3DD73EF8283177D /* BrewfileParser.swift */; };
+		A1B2C3D4E5F60718A9B0C1D2 /* MigratableApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A4B5C6071809A1B2C3 /* MigratableApp.swift */; };
+		E3F4A5B6C7D80192A3B4C5D6 /* MigrationScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A5B6C7D8E9012F3A4B5C6D /* MigrationScanView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -54,6 +56,8 @@
 		C4DBCC4A9E95E0E7A26FC429 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E05DF1B67A6A210B524DA8CF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F82D09D0DD9B0F504FFB30A0 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
+		D1E2F3A4B5C6071809A1B2C3 /* MigratableApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigratableApp.swift; sourceTree = "<group>"; };
+		F4A5B6C7D8E9012F3A4B5C6D /* MigrationScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationScanView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -77,6 +81,7 @@
 				355D2976517975C5C3DFB5F4 /* EmptyStateView.swift */,
 				F82D09D0DD9B0F504FFB30A0 /* HelpView.swift */,
 				64EC84129F800151C641CF65 /* InstalledListView.swift */,
+				F4A5B6C7D8E9012F3A4B5C6D /* MigrationScanView.swift */,
 				BEE6AE3145AE914E677A2790 /* PackageDetailView.swift */,
 				4EB814FB64C5EFEA1F4BED85 /* PackageRowView.swift */,
 				0764E78129A603E82C68CC96 /* RootContentView.swift */,
@@ -98,6 +103,7 @@
 				076800E1FB5750216D1A8DAF /* AppState.swift */,
 				BB6481A2E615EF61078E7A9D /* BrewfileEntry.swift */,
 				52E00817C58F1894743F7457 /* BrewPackage.swift */,
+				D1E2F3A4B5C6071809A1B2C3 /* MigratableApp.swift */,
 				931256894C98A3CBEA8C9F0F /* ProcessingLog.swift */,
 			);
 			path = Models;
@@ -219,6 +225,8 @@
 				C4656E342AE6533608EC7CA1 /* HelpView.swift in Sources */,
 				0E79052390CF17AD9F49C098 /* InstalledListView.swift in Sources */,
 				7D23AF79A528A13F538861EC /* InstalledViewModel.swift in Sources */,
+				A1B2C3D4E5F60718A9B0C1D2 /* MigratableApp.swift in Sources */,
+				E3F4A5B6C7D80192A3B4C5D6 /* MigrationScanView.swift in Sources */,
 				CAB052BE87B0ED51C5ABAD30 /* PackageDetailView.swift in Sources */,
 				7C2B7BEC58E60A5D41476D56 /* PackageRowView.swift in Sources */,
 				74544E787FE740FDD40A3E36 /* ProcessingLog.swift in Sources */,
