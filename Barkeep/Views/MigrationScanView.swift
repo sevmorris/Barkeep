@@ -106,7 +106,7 @@ struct MigrationScanView: View {
 
     private func addSelected() {
         for app in apps where app.selected {
-            brewfileVM.add(name: app.caskToken, kind: .cask, section: "Casks", brewfileURL: brewfileURL)
+            brewfileVM.add(name: app.caskToken, kind: .cask, section: "Migrated", brewfileURL: brewfileURL)
         }
     }
 }
