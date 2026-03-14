@@ -125,18 +125,26 @@ actor BrewRunner {
             process.standardError = errPipe
 
             nonisolated(unsafe) var resumed = false
+            // Read stdout/stderr incrementally to avoid pipe-buffer deadlock
+            // on large outputs (e.g. `brew search --cask ""` returns >64KB).
+            nonisolated(unsafe) var stdoutData = Data()
             nonisolated(unsafe) var stderrData = Data()
+            outPipe.fileHandleForReading.readabilityHandler = { handle in
+                stdoutData.append(handle.availableData)
+            }
             errPipe.fileHandleForReading.readabilityHandler = { handle in
                 stderrData.append(handle.availableData)
             }
 
             process.terminationHandler = { p in
+                outPipe.fileHandleForReading.readabilityHandler = nil
                 errPipe.fileHandleForReading.readabilityHandler = nil
+                // Drain any remaining data
+                stdoutData.append(outPipe.fileHandleForReading.readDataToEndOfFile())
                 guard !resumed else { return }
                 resumed = true
-                let data = outPipe.fileHandleForReading.readDataToEndOfFile()
                 if p.terminationStatus == 0 {
-                    continuation.resume(returning: String(data: data, encoding: .utf8) ?? "")
+                    continuation.resume(returning: String(data: stdoutData, encoding: .utf8) ?? "")
                 } else {
                     let msg = String(data: stderrData, encoding: .utf8)?
                         .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -264,18 +272,34 @@ actor BrewRunner {
 
     // MARK: - Migratable cask scan
 
+    /// Cached cask catalog with timestamp for fast repeat scans.
+    private static var cachedCaskTokens: (tokens: Set<String>, date: Date)?
+    private static let caskCacheTTL: TimeInterval = 3600  // 1 hour
+
     /// Scan /Applications for .app bundles that match known cask tokens
     /// but aren't already in the Brewfile or installed as casks.
-    func findMigratableCasks(brewfileEntries: Set<String>) async -> [MigratableApp] {
-        // 1. Get all known cask tokens
-        guard let allCasksRaw = try? await capture(["search", "--cask", ""]) else { return [] }
-        let allCaskTokens = Set(
-            allCasksRaw.components(separatedBy: "\n")
-                .map { $0.trimmingCharacters(in: .whitespaces) }
-                .filter { !$0.isEmpty }
-        )
+    func findMigratableCasks(
+        brewfileEntries: Set<String>,
+        progress: (@Sendable (String) -> Void)? = nil
+    ) async -> [MigratableApp] {
+        // 1. Get all known cask tokens (cached for 1 hour)
+        progress?("Fetching cask catalog…")
+        let allCaskTokens: Set<String>
+        if let cached = Self.cachedCaskTokens, Date().timeIntervalSince(cached.date) < Self.caskCacheTTL {
+            allCaskTokens = cached.tokens
+        } else {
+            guard let allCasksRaw = try? await capture(["search", "--cask", ""]) else { return [] }
+            let tokens = Set(
+                allCasksRaw.components(separatedBy: "\n")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+            )
+            Self.cachedCaskTokens = (tokens, Date())
+            allCaskTokens = tokens
+        }
 
         // 2. Get currently installed casks
+        progress?("Checking installed casks…")
         let installedCasks: Set<String>
         if let installedRaw = try? await capture(["list", "--cask"]) {
             installedCasks = Set(
@@ -288,6 +312,7 @@ actor BrewRunner {
         }
 
         // 3. Scan /Applications
+        progress?("Scanning /Applications…")
         let fm = FileManager.default
         let appsURL = URL(fileURLWithPath: "/Applications")
         guard let contents = try? fm.contentsOfDirectory(

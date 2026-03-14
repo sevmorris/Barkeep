@@ -8,6 +8,7 @@ struct MigrationScanView: View {
     @State private var apps: [MigratableApp] = []
     @State private var isScanning = true
     @State private var scanComplete = false
+    @State private var scanStatus = "Fetching cask catalog…"
 
     var body: some View {
         VStack(spacing: 0) {
@@ -32,7 +33,7 @@ struct MigrationScanView: View {
                 VStack(spacing: 12) {
                     ProgressView()
                         .controlSize(.large)
-                    Text("Scanning /Applications…")
+                    Text(scanStatus)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -95,7 +96,9 @@ struct MigrationScanView: View {
 
     private func scan() async {
         let brewfileNames = Set(brewfileVM.allEntries.map(\.name))
-        let results = await BrewRunner.shared.findMigratableCasks(brewfileEntries: brewfileNames)
+        let results = await BrewRunner.shared.findMigratableCasks(brewfileEntries: brewfileNames) { status in
+            Task { @MainActor in scanStatus = status }
+        }
         apps = results
         isScanning = false
         scanComplete = true
