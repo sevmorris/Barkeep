@@ -47,11 +47,14 @@ final class BrewfileViewModel {
             self.error = error.localizedDescription
         }
         isLoading = false
-        Task {
-            let allOutdated = await BrewRunner.shared.outdatedNames()
-            let brewfileNames = Set(allEntries.map(\.name))
-            outdatedNames = allOutdated.intersection(brewfileNames)
-        }
+        Task { await refreshOutdated() }
+    }
+
+    /// Refresh outdated names, filtered to Brewfile entries only.
+    func refreshOutdated() async {
+        let allOutdated = await BrewRunner.shared.outdatedNames()
+        let brewfileNames = Set(allEntries.map(\.name))
+        outdatedNames = allOutdated.intersection(brewfileNames)
     }
 
     // MARK: - On-demand detail

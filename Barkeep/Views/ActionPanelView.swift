@@ -113,7 +113,7 @@ struct ActionPanelView: View {
             }
             log.append("Done.")
             // Refresh outdated list after upgrade/install/uninstall
-            brewfileVM.outdatedNames = await BrewRunner.shared.outdatedNames()
+            await brewfileVM.refreshOutdated()
         } catch {
             log.append("Error: \(error.localizedDescription)", level: .error)
             onError(error.localizedDescription)
@@ -149,7 +149,7 @@ struct ActionPanelView: View {
             }
         }
 
-        brewfileVM.outdatedNames = await BrewRunner.shared.outdatedNames()
+        await brewfileVM.refreshOutdated()
         // Reload detail so isBrewManaged updates
         if let entry = brewfileVM.selectedEntry {
             Task { await brewfileVM.loadDetail(for: entry) }
