@@ -235,10 +235,28 @@ actor BrewRunner {
                 let outdated = c["outdated"] as? Bool ?? false
                 let conflicts = (c["conflicts_with"] as? [String: Any])?["cask"] as? [String] ?? []
                 let installTime = c["installed_time"] as? TimeInterval
+                let brewInstalled = c["installed"] as? String != nil
+
+                // Check if the app exists in /Applications even if not brew-managed
+                // (handles migrated / manually-installed apps)
+                let appInApplications: Bool = {
+                    guard !brewInstalled,
+                          let artifacts = c["artifacts"] as? [[String: Any]] else { return false }
+                    for artifact in artifacts {
+                        if let apps = artifact["app"] as? [String] {
+                            for app in apps {
+                                if FileManager.default.fileExists(atPath: "/Applications/\(app)") {
+                                    return true
+                                }
+                            }
+                        }
+                    }
+                    return false
+                }()
 
                 var pkg = BrewPackage(name: token, kind: .cask,
                                       description: desc, version: version, homepage: home,
-                                      isInstalled: true)
+                                      isInstalled: brewInstalled || appInApplications)
                 pkg.tap         = tap
                 pkg.caveats     = caveats.trimmingCharacters(in: .whitespacesAndNewlines)
                 pkg.outdated    = outdated
