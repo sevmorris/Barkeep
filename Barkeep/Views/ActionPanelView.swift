@@ -30,16 +30,22 @@ struct ActionPanelView: View {
                             Divider().padding(.vertical, 2)
                         }
 
-                        actionButton("Install", icon: "arrow.down.circle") {
-                            Task { await runBrew(["install", entry.name]) }
-                        }
+                        if brewfileVM.selectedDetail?.isInstalled == true {
+                            actionButton("Reinstall", icon: "arrow.down.circle") {
+                                Task { await runBrew(["reinstall", entry.name]) }
+                            }
 
-                        actionButton("Uninstall", icon: "trash", role: .destructive) {
-                            Task {
-                                var args = ["uninstall"]
-                                if entry.kind == .cask { args.append("--cask") }
-                                args.append(entry.name)
-                                await runBrew(args)
+                            actionButton("Uninstall", icon: "trash", role: .destructive) {
+                                Task {
+                                    var args = ["uninstall"]
+                                    if entry.kind == .cask { args.append("--cask") }
+                                    args.append(entry.name)
+                                    await runBrew(args)
+                                }
+                            }
+                        } else {
+                            actionButton("Install", icon: "arrow.down.circle") {
+                                Task { await runBrew(["install", entry.name]) }
                             }
                         }
 
