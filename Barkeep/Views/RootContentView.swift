@@ -3,11 +3,15 @@ import SwiftUI
 struct RootContentView: View {
     @Environment(AppState.self) var appState
     @State private var brewfileVM  = BrewfileViewModel()
+    @State private var installedVM = InstalledViewModel()
+    @State private var sidebarTab  = SidebarTab.brewfile
     @State private var log         = ProcessingLog()
     @State private var isRunning   = false
     @State private var showConsole = false
     @State private var alertMessage: String? = nil
     @State private var showMigrationScan = false
+
+    private enum SidebarTab { case brewfile, installed }
 
     var body: some View {
         @Bindable var appState = appState
@@ -29,6 +33,11 @@ struct RootContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .barkeepRefresh)) { _ in
             if let url = appState.brewfilePath { brewfileVM.load(from: url) }
+        }
+        .onChange(of: sidebarTab) { _, tab in
+            if tab == .installed {
+                Task { await installedVM.load(brewfileEntries: brewfileVM.allEntries) }
+            }
         }
         .sheet(isPresented: $showMigrationScan) {
             if let url = appState.brewfilePath {
@@ -53,8 +62,24 @@ struct RootContentView: View {
             Divider()
 
             HStack(spacing: 0) {
-                BrewfileListView(vm: brewfileVM)
-                    .frame(width: 240)
+                VStack(spacing: 0) {
+                    Picker("", selection: $sidebarTab) {
+                        Text("Brewfile").tag(SidebarTab.brewfile)
+                        Text("Installed").tag(SidebarTab.installed)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .padding(8)
+
+                    Divider()
+
+                    if sidebarTab == .brewfile {
+                        BrewfileListView(vm: brewfileVM)
+                    } else {
+                        InstalledListView(vm: installedVM, outdatedNames: brewfileVM.outdatedNames)
+                    }
+                }
+                .frame(width: 240)
 
                 Divider()
 
@@ -72,11 +97,13 @@ struct RootContentView: View {
                 Divider()
 
                 ActionPanelView(
-                    brewfileVM:  brewfileVM,
-                    log:         log,
-                    isRunning:   $isRunning,
-                    onError:     { alertMessage = $0 },
-                    brewfilePath: appState.brewfilePath!
+                    brewfileVM:      brewfileVM,
+                    installedVM:     installedVM,
+                    installedPackage: sidebarTab == .installed ? installedVM.selectedPackage : nil,
+                    log:             log,
+                    isRunning:       $isRunning,
+                    onError:         { alertMessage = $0 },
+                    brewfilePath:    appState.brewfilePath!
                 )
                 .frame(width: 220)
             }
@@ -109,6 +136,12 @@ struct RootContentView: View {
                 Label("\(brewfileVM.outdatedNames.count) updates", systemImage: "arrow.up.circle.fill")
                     .font(.footnote)
                     .foregroundStyle(.orange)
+            }
+
+            if installedVM.untrackedCount > 0 {
+                Label("\(installedVM.untrackedCount) untracked", systemImage: "questionmark.circle.fill")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             if let update = appState.availableUpdate {
@@ -160,7 +193,13 @@ struct RootContentView: View {
 
     @ViewBuilder
     private var detailPanel: some View {
-        if let entry = brewfileVM.selectedEntry {
+        if sidebarTab == .installed {
+            if let pkg = installedVM.selectedPackage {
+                PackageDetailView(package: pkg)
+            } else {
+                EmptyStateView()
+            }
+        } else if let entry = brewfileVM.selectedEntry {
             if brewfileVM.isLoadingDetail {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

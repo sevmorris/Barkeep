@@ -2,10 +2,15 @@ import SwiftUI
 
 struct ActionPanelView: View {
     @Bindable var brewfileVM: BrewfileViewModel
+    var installedVM: InstalledViewModel? = nil
+    var installedPackage: BrewPackage? = nil
     var log: ProcessingLog
     @Binding var isRunning: Bool
     var onError: (String) -> Void
     var brewfilePath: URL
+
+    @State private var addToSection = ""
+    @State private var newSectionText = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -21,7 +26,18 @@ struct ActionPanelView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
-                    if let entry = brewfileVM.selectedEntry {
+                    if let pkg = installedPackage {
+                        if !pkg.isInBrewfile {
+                            addToBrewfileView(pkg: pkg)
+                        } else {
+                            Text("Tracked in Brewfile.")
+                                .font(.footnote)
+                                .foregroundStyle(.tertiary)
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 8)
+                        }
+                    } else if let entry = brewfileVM.selectedEntry {
                         // Update badge in actions if outdated
                         if brewfileVM.outdatedNames.contains(entry.name) {
                             actionButton("Upgrade", icon: "arrow.up.circle.fill", tint: .orange) {
@@ -76,6 +92,46 @@ struct ActionPanelView: View {
     }
 
     // MARK: - Subviews
+
+    private static let newSectionSentinel = "__new__"
+
+    @ViewBuilder
+    private func addToBrewfileView(pkg: BrewPackage) -> some View {
+        let sections = brewfileVM.sectionNames
+        VStack(alignment: .leading, spacing: 8) {
+            if sections.isEmpty {
+                TextField("Section name", text: $newSectionText)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.body)
+            } else {
+                Picker("", selection: $addToSection) {
+                    ForEach(sections, id: \.self) { Text($0).tag($0) }
+                    Text("New Section…").tag(Self.newSectionSentinel)
+                }
+                .labelsHidden()
+                if addToSection == Self.newSectionSentinel {
+                    TextField("Section name", text: $newSectionText)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.body)
+                }
+            }
+            actionButton("Add to Brewfile", icon: "plus.circle") {
+                let section: String
+                if sections.isEmpty || addToSection == Self.newSectionSentinel {
+                    section = newSectionText.trimmingCharacters(in: .whitespaces)
+                } else {
+                    section = addToSection.isEmpty ? (sections.first ?? "") : addToSection
+                }
+                guard !section.isEmpty else { return }
+                brewfileVM.add(name: pkg.name, kind: pkg.kind, section: section, brewfileURL: brewfilePath)
+                installedVM?.markInBrewfile(name: pkg.name, kind: pkg.kind, inBrewfile: true)
+            }
+        }
+        .onChange(of: pkg.id) { _, _ in
+            addToSection = ""
+            newSectionText = ""
+        }
+    }
 
     @ViewBuilder
     private func actionButton(
