@@ -1,4 +1,7 @@
 import Foundation
+import os.log
+
+private let updateLog = Logger(subsystem: "io.github.sevmorris.Barkeep", category: "UpdateChecker")
 
 struct AvailableUpdate: Sendable {
     let version: String
@@ -11,23 +14,43 @@ actor UpdateChecker {
     private let apiURL = URL(string: "https://api.github.com/repos/sevmorris/Barkeep/releases/latest")!
     private let releasesURL = URL(string: "https://github.com/sevmorris/Barkeep/releases")!
 
+    private let urlSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 5
+        config.timeoutIntervalForResource = 10
+        return URLSession(configuration: config)
+    }()
+
     func checkForUpdate() async -> AvailableUpdate? {
-        guard let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
-        else { return nil }
+        do {
+            guard let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String else {
+                updateLog.error("UpdateChecker: CFBundleShortVersionString missing from bundle")
+                return nil
+            }
 
-        var request = URLRequest(url: apiURL)
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+            var request = URLRequest(url: apiURL)
+            request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
 
-        guard
-            let (data, _) = try? await URLSession.shared.data(for: request),
-            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let tagName = json["tag_name"] as? String
-        else { return nil }
+            let (data, _) = try await urlSession.data(for: request)
 
-        let remoteVersion = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
-        guard isNewer(remoteVersion, than: currentVersion) else { return nil }
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                updateLog.error("UpdateChecker: failed to parse JSON response")
+                return nil
+            }
 
-        return AvailableUpdate(version: remoteVersion, downloadURL: releasesURL)
+            guard let tagName = json["tag_name"] as? String else {
+                updateLog.error("UpdateChecker: tag_name missing from response")
+                return nil
+            }
+
+            let remoteVersion = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
+            guard isNewer(remoteVersion, than: currentVersion) else { return nil }
+
+            return AvailableUpdate(version: remoteVersion, downloadURL: releasesURL)
+        } catch {
+            updateLog.error("UpdateChecker: version check failed: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
     }
 
     private func isNewer(_ remote: String, than current: String) -> Bool {

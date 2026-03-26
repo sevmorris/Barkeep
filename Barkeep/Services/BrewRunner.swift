@@ -1,4 +1,7 @@
 import Foundation
+import os.log
+
+private let brewLog = Logger(subsystem: "io.github.sevmorris.Barkeep", category: "BrewRunner")
 
 enum BrewError: LocalizedError {
     case notFound
@@ -17,10 +20,46 @@ enum BrewError: LocalizedError {
     }
 }
 
+private final class ResumeGuard {
+    private var resumed = false
+    func tryResume() -> Bool {
+        guard !resumed else { return false }
+        resumed = true
+        return true
+    }
+}
+
 actor BrewRunner {
     static let shared = BrewRunner()
 
     private var runningProcess: Process?
+
+    // MARK: - Info cache
+
+    private var infoCache: [String: (BrewPackage, Date)] = [:]
+    private let infoCacheTTL: TimeInterval = 300  // 5 minutes
+
+    private func cachedInfo(name: String, kind: PackageKind) -> BrewPackage? {
+        let key = "\(kind):\(name)"
+        guard let entry = infoCache[key] else { return nil }
+        guard Date().timeIntervalSince(entry.1) < infoCacheTTL else {
+            infoCache.removeValue(forKey: key)
+            return nil
+        }
+        return entry.0
+    }
+
+    private func cacheInfo(_ pkg: BrewPackage) {
+        let key = "\(pkg.kind):\(pkg.name)"
+        infoCache[key] = (pkg, Date())
+    }
+
+    private func invalidateCache(names: [String]) {
+        for name in names {
+            infoCache.removeValue(forKey: "\(PackageKind.formula):\(name)")
+            infoCache.removeValue(forKey: "\(PackageKind.cask):\(name)")
+        }
+    }
 
     // MARK: - Executable
 
@@ -60,7 +99,7 @@ actor BrewRunner {
             process.standardOutput = outPipe
             process.standardError = errPipe
 
-            nonisolated(unsafe) var resumed = false
+            let guard_ = ResumeGuard()
 
             func emit(_ text: String, level: LogLevel) {
                 for line in text.components(separatedBy: "\n") {
@@ -81,8 +120,7 @@ actor BrewRunner {
             process.terminationHandler = { p in
                 outPipe.fileHandleForReading.readabilityHandler = nil
                 errPipe.fileHandleForReading.readabilityHandler = nil
-                guard !resumed else { return }
-                resumed = true
+                guard guard_.tryResume() else { return }
                 if p.terminationStatus == 0 {
                     continuation.resume()
                 } else {
@@ -94,8 +132,9 @@ actor BrewRunner {
                 runningProcess = process
                 try process.run()
             } catch {
-                guard !resumed else { return }
-                resumed = true
+                outPipe.fileHandleForReading.readabilityHandler = nil
+                errPipe.fileHandleForReading.readabilityHandler = nil
+                guard guard_.tryResume() else { return }
                 continuation.resume(throwing: error)
             }
         }
@@ -104,7 +143,8 @@ actor BrewRunner {
     }
 
     func cancel() {
-        runningProcess?.terminate()
+        guard let process = runningProcess else { return }
+        process.terminate()
         runningProcess = nil
     }
 
@@ -124,7 +164,7 @@ actor BrewRunner {
             process.standardOutput = outPipe
             process.standardError = errPipe
 
-            nonisolated(unsafe) var resumed = false
+            let guard_ = ResumeGuard()
             // Read stdout/stderr incrementally to avoid pipe-buffer deadlock
             // on large outputs (e.g. `brew search --cask ""` returns >64KB).
             nonisolated(unsafe) var stdoutData = Data()
@@ -141,10 +181,16 @@ actor BrewRunner {
                 errPipe.fileHandleForReading.readabilityHandler = nil
                 // Drain any remaining data
                 stdoutData.append(outPipe.fileHandleForReading.readDataToEndOfFile())
-                guard !resumed else { return }
-                resumed = true
+                guard guard_.tryResume() else { return }
                 if p.terminationStatus == 0 {
-                    continuation.resume(returning: String(data: stdoutData, encoding: .utf8) ?? "")
+                    if !stderrData.isEmpty,
+                       let msg = String(data: stderrData, encoding: .utf8),
+                       !msg.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        brewLog.debug("[brew stderr] \(msg, privacy: .public)")
+                    }
+                    let result = String(data: stdoutData, encoding: .utf8)
+                        ?? String(decoding: stdoutData, as: UTF8.self)
+                    continuation.resume(returning: result)
                 } else {
                     let msg = String(data: stderrData, encoding: .utf8)?
                         .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -155,8 +201,9 @@ actor BrewRunner {
             do {
                 try process.run()
             } catch {
-                guard !resumed else { return }
-                resumed = true
+                outPipe.fileHandleForReading.readabilityHandler = nil
+                errPipe.fileHandleForReading.readabilityHandler = nil
+                guard guard_.tryResume() else { return }
                 continuation.resume(throwing: error)
             }
         }
@@ -183,9 +230,21 @@ actor BrewRunner {
     /// Fetch detailed info for one or more packages via `brew info --json=v2`.
     func info(names: [String], kind: PackageKind) async throws -> [BrewPackage] {
         guard !names.isEmpty else { return [] }
+
+        // Check cache for single-name lookups
+        if names.count == 1, let cached = cachedInfo(name: names[0], kind: kind) {
+            return [cached]
+        }
+
         let flag = kind == .cask ? "--cask" : "--formula"
         let json = try await capture(["info", "--json=v2", flag] + names)
-        return parseInfoJSON(json, kind: kind)
+        let packages = parseInfoJSON(json, kind: kind)
+
+        for pkg in packages {
+            cacheInfo(pkg)
+        }
+
+        return packages
     }
 
     private func parseInfoJSON(_ json: String, kind: PackageKind) -> [BrewPackage] {
@@ -504,7 +563,9 @@ actor BrewRunner {
             process.terminationHandler = { p in
                 let data = outPipe.fileHandleForReading.readDataToEndOfFile()
                 if p.terminationStatus == 0 {
-                    continuation.resume(returning: String(data: data, encoding: .utf8) ?? "")
+                    let result = String(data: data, encoding: .utf8)
+                        ?? String(decoding: data, as: UTF8.self)
+                    continuation.resume(returning: result)
                 } else {
                     continuation.resume(throwing: BrewError.failed(p.terminationStatus))
                 }
@@ -522,8 +583,7 @@ actor BrewRunner {
             if line.hasPrefix("> ") {
                 // Summary / description line
                 let text = String(line.dropFirst(2))
-                    .replacingOccurrences(of: "<", with: "")
-                    .replacingOccurrences(of: ">", with: "")
+                    .replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
                     .trimmingCharacters(in: .whitespaces)
                 if !text.hasPrefix("More information:") {
                     summaryLines.append(text)

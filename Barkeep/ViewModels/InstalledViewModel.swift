@@ -29,27 +29,20 @@ final class InstalledViewModel {
     // MARK: - Load
 
     func load(brewfileEntries: [BrewfileEntry]) async {
-        isLoading = true
-        error = nil
-
-        do {
+        await withLoadingState {
             async let formulaeNames = BrewRunner.shared.listFormulae()
             async let caskNames     = BrewRunner.shared.listCasks()
 
             let (fNames, cNames) = try await (formulaeNames, caskNames)
             let tracked = Set(brewfileEntries.map { $0.name })
 
-            formulae = fNames.map {
+            self.formulae = fNames.map {
                 BrewPackage(name: $0, kind: .formula, isInstalled: true, isInBrewfile: tracked.contains($0))
             }
-            casks = cNames.map {
+            self.casks = cNames.map {
                 BrewPackage(name: $0, kind: .cask, isInstalled: true, isInBrewfile: tracked.contains($0))
             }
-        } catch {
-            self.error = error.localizedDescription
         }
-
-        isLoading = false
     }
 
     // MARK: - On-demand detail
@@ -57,14 +50,28 @@ final class InstalledViewModel {
     /// Fetch description/version/homepage for a package when it's selected.
     func loadDetail(for package: BrewPackage) async {
         guard package.kind != .tap else { return }
+        let packageID = package.id
 
         async let infoFetch  = BrewRunner.shared.info(names: [package.name], kind: package.kind)
         async let tldrFetch  = BrewRunner.shared.tldr(for: package.name)
         async let manFetch   = BrewRunner.shared.manPage(for: package.name)
         async let usesFetch  = BrewRunner.shared.uses(for: package.name)
 
-        let (infos, tldrResult, manResult, usesResult) =
-            await (try? infoFetch ?? [], tldrFetch, manFetch, usesFetch)
+        var infos: [BrewPackage]?
+        var tldrResult: (summary: String, examples: [TldrExample])
+        var manResult: [ManSection]
+        var usesResult: [String]
+
+        do {
+            infos = try await infoFetch
+        } catch {
+            infos = nil
+        }
+        tldrResult = await tldrFetch
+        manResult  = await manFetch
+        usesResult = await usesFetch
+
+        guard selectedPackage?.id == packageID else { return }
 
         guard var info = infos?.first else { return }
         info.isInBrewfile        = package.isInBrewfile
@@ -91,6 +98,16 @@ final class InstalledViewModel {
     }
 
     // MARK: - Private
+
+    private func withLoadingState(_ block: () async throws -> Void) async {
+        isLoading = true
+        do {
+            try await block()
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isLoading = false
+    }
 
     private func updatePackage(name: String, kind: PackageKind, transform: (BrewPackage) -> BrewPackage) {
         if kind == .formula, let idx = formulae.firstIndex(where: { $0.name == name }) {

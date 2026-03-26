@@ -61,6 +61,7 @@ struct BrewfilePickerView: View {
         panel.prompt = "Select"
 
         if panel.runModal() == .OK, let url = panel.url {
+            guard FileManager.default.isReadableFile(atPath: url.path) else { return }
             appState.brewfilePath = url
             appState.showBrewfilePicker = false
         }

@@ -12,6 +12,12 @@ final class BrewfileViewModel {
     var filterText = ""
     var outdatedNames: Set<String> = []
 
+    private var undoStack: [[BrewfileNode]] = []
+    private var redoStack: [[BrewfileNode]] = []
+
+    var canUndo: Bool { !undoStack.isEmpty }
+    var canRedo: Bool { !redoStack.isEmpty }
+
     // MARK: - Computed
 
     var allEntries: [BrewfileEntry] {
@@ -61,16 +67,33 @@ final class BrewfileViewModel {
 
     func loadDetail(for entry: BrewfileEntry) async {
         guard entry.kind != .tap else { return }
+        let entryID = entry.id
         selectedDetail = nil
         isLoadingDetail = true
 
-        async let infoFetch  = BrewRunner.shared.info(names: [entry.name], kind: entry.kind)
-        async let tldrFetch  = BrewRunner.shared.tldr(for: entry.name)
-        async let manFetch   = BrewRunner.shared.manPage(for: entry.name)
-        async let usesFetch  = BrewRunner.shared.uses(for: entry.name)
+        async let infoFetch = BrewRunner.shared.info(names: [entry.name], kind: entry.kind)
+        async let tldrFetch = BrewRunner.shared.tldr(for: entry.name)
+        async let manFetch  = BrewRunner.shared.manPage(for: entry.name)
+        async let usesFetch = BrewRunner.shared.uses(for: entry.name)
 
-        let (infos, tldrResult, manResult, usesResult) =
-            await (try? infoFetch ?? [], tldrFetch, manFetch, usesFetch)
+        var infos: [BrewPackage]?
+        var tldrResult: (summary: String, examples: [TldrExample])
+        var manResult: [ManSection]
+        var usesResult: [String]
+
+        do {
+            infos = try await infoFetch
+        } catch {
+            infos = nil
+        }
+        tldrResult = await tldrFetch
+        manResult  = await manFetch
+        usesResult = await usesFetch
+
+        guard selectedEntry?.id == entryID else {
+            isLoadingDetail = false
+            return
+        }
 
         if var pkg = infos?.first {
             pkg.isInBrewfile          = true
@@ -84,6 +107,20 @@ final class BrewfileViewModel {
         isLoadingDetail = false
     }
 
+    // MARK: - Undo / Redo
+
+    func undo() {
+        guard let previous = undoStack.popLast() else { return }
+        redoStack.append(nodes)
+        nodes = previous
+    }
+
+    func redo() {
+        guard let next = redoStack.popLast() else { return }
+        undoStack.append(nodes)
+        nodes = next
+    }
+
     // MARK: - Mutations
 
     func contains(name: String, kind: PackageKind) -> Bool {
@@ -92,17 +129,21 @@ final class BrewfileViewModel {
 
     func add(name: String, kind: PackageKind, section: String, brewfileURL: URL) {
         guard !contains(name: name, kind: kind) else { return }
+
+        let sanitized = sanitizeSectionName(section)
         let raw   = BrewfileEntry.canonicalLine(name: name, kind: kind)
-        let entry = BrewfileEntry(name: name, kind: kind, section: section, rawLine: raw)
+        let entry = BrewfileEntry(name: name, kind: kind, section: sanitized, rawLine: raw)
+
+        pushUndo()
 
         // Insert after the last entry in the matching section, or append
         if let idx = nodes.indices.last(where: {
-            if case .entry(let e) = nodes[$0] { return e.section == section } else { return false }
+            if case .entry(let e) = nodes[$0] { return e.section == sanitized } else { return false }
         }) {
             nodes.insert(.entry(entry), at: nodes.index(after: idx))
         } else {
             if !nodes.isEmpty { nodes.append(.blank) }
-            nodes.append(.comment("# \(section)"))
+            nodes.append(.comment("# \(sanitized)"))
             nodes.append(.entry(entry))
         }
 
@@ -110,6 +151,7 @@ final class BrewfileViewModel {
     }
 
     func remove(entry: BrewfileEntry, brewfileURL: URL) {
+        pushUndo()
         nodes.removeAll {
             if case .entry(let e) = $0 { return e.id == entry.id }
             return false
@@ -120,7 +162,33 @@ final class BrewfileViewModel {
 
     // MARK: - Private
 
+    private func pushUndo() {
+        undoStack.append(nodes)
+        redoStack.removeAll()
+    }
+
+    private func sanitizeSectionName(_ name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: .newlines).first ?? ""
+        guard !trimmed.isEmpty else { return "General" }
+        return String(trimmed.prefix(100))
+    }
+
+    private func withLoadingState(_ block: () async throws -> Void) async {
+        isLoading = true
+        do {
+            try await block()
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isLoading = false
+    }
+
     private func save(to url: URL) {
-        try? BrewfileParser.write(nodes: nodes, to: url)
+        do {
+            try BrewfileParser.write(nodes: nodes, to: url)
+        } catch {
+            self.error = "Failed to save Brewfile: \(error.localizedDescription)"
+        }
     }
 }

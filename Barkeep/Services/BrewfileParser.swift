@@ -72,6 +72,12 @@ enum BrewfileParser {
 
     static func write(nodes: [BrewfileNode], to url: URL) throws {
         let content = nodes.map { $0.rawLine }.joined(separator: "\n") + "\n"
+        let reparsed = parse(string: content)
+        let originalCount = entries(from: nodes).count
+        let reparsedCount = entries(from: reparsed).count
+        guard reparsedCount == originalCount else {
+            throw CocoaError(.fileWriteUnknown)
+        }
         try content.write(to: url, atomically: true, encoding: .utf8)
     }
 

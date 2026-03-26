@@ -7,7 +7,6 @@ struct MigrationScanView: View {
 
     @State private var apps: [MigratableApp] = []
     @State private var isScanning = true
-    @State private var scanComplete = false
     @State private var scanStatus = "Fetching cask catalog…"
 
     var body: some View {
@@ -101,7 +100,6 @@ struct MigrationScanView: View {
         }
         apps = results
         isScanning = false
-        scanComplete = true
     }
 
     private func addSelected() {

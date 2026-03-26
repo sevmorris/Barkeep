@@ -18,6 +18,9 @@ final class ProcessingLog {
 
     func append(_ message: String, level: LogLevel = .info) {
         entries.append(LogEntry(message: message, level: level))
+        if entries.count > 1000 {
+            entries.removeFirst(entries.count - 900)
+        }
     }
 
     func clear() {
