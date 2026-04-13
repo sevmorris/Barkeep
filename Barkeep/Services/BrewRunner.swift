@@ -101,7 +101,7 @@ actor BrewRunner {
 
             let guard_ = ResumeGuard()
 
-            func emit(_ text: String, level: LogLevel) {
+            @Sendable func emit(_ text: String, level: LogLevel) {
                 for line in text.components(separatedBy: "\n") {
                     let t = line.trimmingCharacters(in: .whitespaces)
                     if !t.isEmpty {
