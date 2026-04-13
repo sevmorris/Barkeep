@@ -462,6 +462,10 @@ actor BrewRunner {
     /// Fetches and parses the man page for a formula, returning key sections.
     /// Returns empty array for casks or when no man page exists.
     func manPage(for name: String) async -> [ManSection] {
+        // Validate name matches valid formula/cask token characters before passing to shell
+        guard name.range(of: #"^[a-zA-Z0-9][a-zA-Z0-9@+.\-]*$"#, options: .regularExpression) != nil else {
+            return []
+        }
         guard let raw = try? await captureRaw("/bin/bash",
             args: ["-c", "MANPAGER=cat man -- \"$1\" 2>/dev/null | col -b", "bash", name]),
               !raw.isEmpty

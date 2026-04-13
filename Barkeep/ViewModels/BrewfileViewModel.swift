@@ -189,6 +189,10 @@ final class BrewfileViewModel {
             try BrewfileParser.write(nodes: nodes, to: url)
         } catch {
             self.error = "Failed to save Brewfile: \(error.localizedDescription)"
+            // Roll back the mutation so in-memory state stays consistent with the file
+            if let previous = undoStack.popLast() {
+                nodes = previous
+            }
         }
     }
 }

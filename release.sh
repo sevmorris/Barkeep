@@ -69,6 +69,7 @@ else
     /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$PLIST"
     # Keep project.yml in sync (XcodeGen source of truth)
     sed -i '' "s/CFBundleShortVersionString: .*/CFBundleShortVersionString: \"$VERSION\"/" "$PROJECT_DIR/project.yml"
+    sed -i '' "s/CFBundleVersion: .*/CFBundleVersion: \"$VERSION\"/" "$PROJECT_DIR/project.yml"
     ok "Bumped $CURRENT → $VERSION"
     git add "$PLIST" "$PROJECT_DIR/project.yml"
     git commit -m "Bump version to $VERSION"
@@ -78,7 +79,7 @@ fi
 # ── Build ─────────────────────────────────────────────────────────────────────
 step "Building (clean, Release)"
 rm -rf "$DERIVED_DATA"
-rm -rf ~/Library/Caches/com.apple.dt.Xcode* 2>/dev/null || true
+rm -rf ~/Library/Caches/com.apple.dt.Xcode/ 2>/dev/null || true
 rm -rf ~/Library/Developer/Xcode/DerivedData/ModuleCache* 2>/dev/null || true
 ok "Xcode caches cleared"
 xcodebuild \
