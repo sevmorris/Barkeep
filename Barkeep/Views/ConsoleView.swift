@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ConsoleView: View {
     let log: ProcessingLog
+    @State private var showFullLog = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -11,6 +12,14 @@ struct ConsoleView: View {
                     .kerning(0.5)
                     .foregroundStyle(.tertiary)
                 Spacer()
+                Button {
+                    showFullLog.toggle()
+                } label: {
+                    Text(showFullLog ? "Summary" : "Full Log")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
                 Button {
                     log.clear()
                 } label: {
@@ -25,8 +34,10 @@ struct ConsoleView: View {
 
             Divider()
 
-            if log.entries.isEmpty {
-                Text("No output yet.")
+            let displayed = showFullLog ? log.entries : log.statusEntries
+
+            if displayed.isEmpty {
+                Text(log.entries.isEmpty ? "No output yet." : "No status lines yet.")
                     .font(.system(.footnote, design: .monospaced))
                     .foregroundStyle(.tertiary)
                     .padding(12)
@@ -35,7 +46,7 @@ struct ConsoleView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 3) {
-                            ForEach(log.entries) { entry in
+                            ForEach(displayed) { entry in
                                 Text(entry.message)
                                     .font(.system(.footnote, design: .monospaced))
                                     .foregroundStyle(color(for: entry.level))
@@ -45,8 +56,8 @@ struct ConsoleView: View {
                         }
                         .padding(12)
                     }
-                    .onChange(of: log.entries.count) { _, _ in
-                        if let last = log.entries.last {
+                    .onChange(of: displayed.count) { _, _ in
+                        if let last = displayed.last {
                             withAnimation(.easeOut(duration: 0.15)) {
                                 proxy.scrollTo(last.id, anchor: .bottom)
                             }

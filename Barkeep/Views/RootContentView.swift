@@ -148,14 +148,14 @@ struct RootContentView: View {
 
             if let update = appState.availableUpdate {
                 Button {
-                    NSWorkspace.shared.open(update.downloadURL)
+                    Task { await checkForUpdates(silent: false, appState: appState) }
                 } label: {
                     Label("Barkeep \(update.version) available", systemImage: "arrow.down.circle.fill")
                         .font(.footnote)
                         .foregroundStyle(.blue)
                 }
                 .buttonStyle(.plain)
-                .help("Open GitHub releases page")
+                .help("Update available — click to download or view release notes")
             }
 
             if isRunning {

@@ -1,12 +1,14 @@
 # Xcode
 build/
 *.xcuserstate
-*.xcworkspace/xcuserdata/
+*.xcworkspace/
 xcuserdata/
 DerivedData/
 *.moved-aside
 *.hmap
 *.ipa
+*.dSYM/
+*.dSYM.zip
 
 # macOS
 .DS_Store
@@ -16,3 +18,9 @@ DerivedData/
 
 # Temp
 *.tmp
+
+# Release artifacts
+*.dmg
+
+# Claude
+.claude/

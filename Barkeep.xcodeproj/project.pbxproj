@@ -17,9 +17,13 @@
 		32A2BC67E0B737F5DF997527 /* ActionPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A5401537BB31A8BE2B168D9 /* ActionPanelView.swift */; };
 		5096AED61DD9B180B69000C5 /* BrewfilePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BBFAF6524FF818F342A190D /* BrewfilePickerView.swift */; };
 		5240236D547818EFE4C33927 /* RootContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0764E78129A603E82C68CC96 /* RootContentView.swift */; };
+		6A1F072F719FCFFC34ECDEBA /* MigrationScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD8AAC6C5A564C6530CEA36E /* MigrationScanView.swift */; };
 		74544E787FE740FDD40A3E36 /* ProcessingLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931256894C98A3CBEA8C9F0F /* ProcessingLog.swift */; };
 		7C2B7BEC58E60A5D41476D56 /* PackageRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EB814FB64C5EFEA1F4BED85 /* PackageRowView.swift */; };
 		7D23AF79A528A13F538861EC /* InstalledViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 785D7B9CE182339A802885A4 /* InstalledViewModel.swift */; };
+		7F747DD3D6F937D13DF5A9C6 /* BarkeepTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA483CBD6AB1F29CFF880E2F /* BarkeepTests.swift */; };
+		8A735375C6DA32A33FFE4775 /* MigratableApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CEB947E5B260E4DA426017E /* MigratableApp.swift */; };
+		911F6E689C64678B8E360648 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1515D8935F4133FF1B61B619 /* NotificationService.swift */; };
 		B3744A81C87FEC15964DDD3B /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 355D2976517975C5C3DFB5F4 /* EmptyStateView.swift */; };
 		C4656E342AE6533608EC7CA1 /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82D09D0DD9B0F504FFB30A0 /* HelpView.swift */; };
 		CAB052BE87B0ED51C5ABAD30 /* PackageDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE6AE3145AE914E677A2790 /* PackageDetailView.swift */; };
@@ -28,19 +32,30 @@
 		EB2358577C5272B402A43C1F /* BrewfileEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB6481A2E615EF61078E7A9D /* BrewfileEntry.swift */; };
 		F2069600C7982A1AD7D7084B /* BrewfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7438683DB48E09178234F9D8 /* BrewfileViewModel.swift */; };
 		F4C2F27C403B7AB90BDB5AF0 /* BrewfileParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A853DBC4A3DD73EF8283177D /* BrewfileParser.swift */; };
-		A1B2C3D4E5F60718A9B0C1D2 /* MigratableApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A4B5C6071809A1B2C3 /* MigratableApp.swift */; };
-		E3F4A5B6C7D80192A3B4C5D6 /* MigrationScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A5B6C7D8E9012F3A4B5C6D /* MigrationScanView.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		19FFB2529BFBECF0731AE3C0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D772057D33859D753E2151F6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 21F3BB9573A3D3F6DB4E1D85;
+			remoteInfo = Barkeep;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		0764E78129A603E82C68CC96 /* RootContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootContentView.swift; sourceTree = "<group>"; };
 		076800E1FB5750216D1A8DAF /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		11BA47C5F82AE0F34D764EE1 /* BrewfileListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrewfileListView.swift; sourceTree = "<group>"; };
+		1515D8935F4133FF1B61B619 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		323079A45F04FAB3BF147CEA /* BarkeepApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarkeepApp.swift; sourceTree = "<group>"; };
 		355D2976517975C5C3DFB5F4 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		4A5401537BB31A8BE2B168D9 /* ActionPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionPanelView.swift; sourceTree = "<group>"; };
+		4CEB947E5B260E4DA426017E /* MigratableApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigratableApp.swift; sourceTree = "<group>"; };
 		4EB814FB64C5EFEA1F4BED85 /* PackageRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackageRowView.swift; sourceTree = "<group>"; };
 		52E00817C58F1894743F7457 /* BrewPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrewPackage.swift; sourceTree = "<group>"; };
+		550861B24DBABFAA5C5AE258 /* BarkeepTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BarkeepTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5BBFAF6524FF818F342A190D /* BrewfilePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrewfilePickerView.swift; sourceTree = "<group>"; };
 		601F0503F3366DE44BF30B40 /* Barkeep.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Barkeep.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		64EC84129F800151C641CF65 /* InstalledListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstalledListView.swift; sourceTree = "<group>"; };
@@ -54,18 +69,27 @@
 		BB6481A2E615EF61078E7A9D /* BrewfileEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrewfileEntry.swift; sourceTree = "<group>"; };
 		BEE6AE3145AE914E677A2790 /* PackageDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackageDetailView.swift; sourceTree = "<group>"; };
 		C4DBCC4A9E95E0E7A26FC429 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		CD8AAC6C5A564C6530CEA36E /* MigrationScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationScanView.swift; sourceTree = "<group>"; };
+		DA483CBD6AB1F29CFF880E2F /* BarkeepTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarkeepTests.swift; sourceTree = "<group>"; };
 		E05DF1B67A6A210B524DA8CF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F82D09D0DD9B0F504FFB30A0 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
-		D1E2F3A4B5C6071809A1B2C3 /* MigratableApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigratableApp.swift; sourceTree = "<group>"; };
-		F4A5B6C7D8E9012F3A4B5C6D /* MigrationScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigrationScanView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		29AB0431D23CA5CF9FB8F87B /* BarkeepTests */ = {
+			isa = PBXGroup;
+			children = (
+				DA483CBD6AB1F29CFF880E2F /* BarkeepTests.swift */,
+			);
+			path = BarkeepTests;
+			sourceTree = "<group>";
+		};
 		2E22D2C2C15C02FE2FC938AE /* Services */ = {
 			isa = PBXGroup;
 			children = (
 				A853DBC4A3DD73EF8283177D /* BrewfileParser.swift */,
 				85BDDD39E42E960B6477CCE2 /* BrewRunner.swift */,
+				1515D8935F4133FF1B61B619 /* NotificationService.swift */,
 				830CF38139D96D05EA9DDD57 /* UpdateChecker.swift */,
 			);
 			path = Services;
@@ -81,7 +105,7 @@
 				355D2976517975C5C3DFB5F4 /* EmptyStateView.swift */,
 				F82D09D0DD9B0F504FFB30A0 /* HelpView.swift */,
 				64EC84129F800151C641CF65 /* InstalledListView.swift */,
-				F4A5B6C7D8E9012F3A4B5C6D /* MigrationScanView.swift */,
+				CD8AAC6C5A564C6530CEA36E /* MigrationScanView.swift */,
 				BEE6AE3145AE914E677A2790 /* PackageDetailView.swift */,
 				4EB814FB64C5EFEA1F4BED85 /* PackageRowView.swift */,
 				0764E78129A603E82C68CC96 /* RootContentView.swift */,
@@ -93,6 +117,7 @@
 			isa = PBXGroup;
 			children = (
 				9EB529F5A1C0142D211F5058 /* Barkeep */,
+				29AB0431D23CA5CF9FB8F87B /* BarkeepTests */,
 				965591EC2740ECC6ECE7DA1E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -103,7 +128,7 @@
 				076800E1FB5750216D1A8DAF /* AppState.swift */,
 				BB6481A2E615EF61078E7A9D /* BrewfileEntry.swift */,
 				52E00817C58F1894743F7457 /* BrewPackage.swift */,
-				D1E2F3A4B5C6071809A1B2C3 /* MigratableApp.swift */,
+				4CEB947E5B260E4DA426017E /* MigratableApp.swift */,
 				931256894C98A3CBEA8C9F0F /* ProcessingLog.swift */,
 			);
 			path = Models;
@@ -113,6 +138,7 @@
 			isa = PBXGroup;
 			children = (
 				601F0503F3366DE44BF30B40 /* Barkeep.app */,
+				550861B24DBABFAA5C5AE258 /* BarkeepTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -161,6 +187,24 @@
 			productReference = 601F0503F3366DE44BF30B40 /* Barkeep.app */;
 			productType = "com.apple.product-type.application";
 		};
+		DB68682C9CCFD2594A14643D /* BarkeepTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 893DF6BFB146CE82B77A7234 /* Build configuration list for PBXNativeTarget "BarkeepTests" */;
+			buildPhases = (
+				CC8ABE20011AE2ED6D55E533 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				1468788F570168E0A33EB47E /* PBXTargetDependency */,
+			);
+			name = BarkeepTests;
+			packageProductDependencies = (
+			);
+			productName = BarkeepTests;
+			productReference = 550861B24DBABFAA5C5AE258 /* BarkeepTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -190,6 +234,7 @@
 			projectRoot = "";
 			targets = (
 				21F3BB9573A3D3F6DB4E1D85 /* Barkeep */,
+				DB68682C9CCFD2594A14643D /* BarkeepTests */,
 			);
 		};
 /* End PBXProject section */
@@ -225,8 +270,9 @@
 				C4656E342AE6533608EC7CA1 /* HelpView.swift in Sources */,
 				0E79052390CF17AD9F49C098 /* InstalledListView.swift in Sources */,
 				7D23AF79A528A13F538861EC /* InstalledViewModel.swift in Sources */,
-				A1B2C3D4E5F60718A9B0C1D2 /* MigratableApp.swift in Sources */,
-				E3F4A5B6C7D80192A3B4C5D6 /* MigrationScanView.swift in Sources */,
+				8A735375C6DA32A33FFE4775 /* MigratableApp.swift in Sources */,
+				6A1F072F719FCFFC34ECDEBA /* MigrationScanView.swift in Sources */,
+				911F6E689C64678B8E360648 /* NotificationService.swift in Sources */,
 				CAB052BE87B0ED51C5ABAD30 /* PackageDetailView.swift in Sources */,
 				7C2B7BEC58E60A5D41476D56 /* PackageRowView.swift in Sources */,
 				74544E787FE740FDD40A3E36 /* ProcessingLog.swift in Sources */,
@@ -235,9 +281,43 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CC8ABE20011AE2ED6D55E533 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7F747DD3D6F937D13DF5A9C6 /* BarkeepTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		1468788F570168E0A33EB47E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 21F3BB9573A3D3F6DB4E1D85 /* Barkeep */;
+			targetProxy = 19FFB2529BFBECF0731AE3C0 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		42651D16479147558C3EDD16 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.sevmorris.BarkeepTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Barkeep.app/Contents/MacOS/Barkeep";
+			};
+			name = Release;
+		};
 		7AD58FBD12A31A7B75AE1165 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -336,6 +416,24 @@
 			};
 			name = Release;
 		};
+		C7826EC90D47C0A554205639 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.sevmorris.BarkeepTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Barkeep.app/Contents/MacOS/Barkeep";
+			};
+			name = Debug;
+		};
 		D921BF31F8DF249A5D273F42 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -416,6 +514,15 @@
 			buildConfigurations = (
 				D921BF31F8DF249A5D273F42 /* Debug */,
 				C2433AB6468F1F15A2323CE2 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		893DF6BFB146CE82B77A7234 /* Build configuration list for PBXNativeTarget "BarkeepTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C7826EC90D47C0A554205639 /* Debug */,
+				42651D16479147558C3EDD16 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

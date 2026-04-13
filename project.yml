@@ -42,3 +42,17 @@ targets:
         NSHumanReadableDescription: Homebrew package manager
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: false
+
+  BarkeepTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: BarkeepTests
+    dependencies:
+      - target: Barkeep
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.sevmorris.BarkeepTests
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        GENERATE_INFOPLIST_FILE: YES

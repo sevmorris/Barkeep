@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import os.log
 
 private let updateLog = Logger(subsystem: "io.github.sevmorris.Barkeep", category: "UpdateChecker")
@@ -6,13 +6,40 @@ private let updateLog = Logger(subsystem: "io.github.sevmorris.Barkeep", categor
 struct AvailableUpdate: Sendable {
     let version: String
     let downloadURL: URL
+    let releaseURL: URL
 }
 
 actor UpdateChecker {
     static let shared = UpdateChecker()
 
+    enum Result {
+        case upToDate(version: String)
+        case available(version: String, downloadURL: URL, releaseURL: URL)
+        case error(String)
+    }
+
+    private struct Release: Decodable {
+        let tagName: String
+        let htmlUrl: String
+        let assets: [Asset]
+
+        struct Asset: Decodable {
+            let name: String
+            let browserDownloadUrl: String
+            enum CodingKeys: String, CodingKey {
+                case name
+                case browserDownloadUrl = "browser_download_url"
+            }
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case tagName = "tag_name"
+            case htmlUrl = "html_url"
+            case assets
+        }
+    }
+
     private let apiURL = URL(string: "https://api.github.com/repos/sevmorris/Barkeep/releases/latest")!
-    private let releasesURL = URL(string: "https://github.com/sevmorris/Barkeep/releases")!
 
     private let urlSession: URLSession = {
         let config = URLSessionConfiguration.default
@@ -21,47 +48,81 @@ actor UpdateChecker {
         return URLSession(configuration: config)
     }()
 
-    func checkForUpdate() async -> AvailableUpdate? {
+    func check() async -> Result {
         do {
-            guard let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String else {
-                updateLog.error("UpdateChecker: CFBundleShortVersionString missing from bundle")
-                return nil
-            }
+            let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
 
-            var request = URLRequest(url: apiURL)
+            var request = URLRequest(url: apiURL, cachePolicy: .reloadIgnoringLocalCacheData)
             request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
 
-            let (data, _) = try await urlSession.data(for: request)
+            let (data, response) = try await urlSession.data(for: request)
 
-            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                updateLog.error("UpdateChecker: failed to parse JSON response")
-                return nil
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                return .error("Could not reach GitHub. Check your internet connection.")
             }
 
-            guard let tagName = json["tag_name"] as? String else {
-                updateLog.error("UpdateChecker: tag_name missing from response")
-                return nil
+            let release = try JSONDecoder().decode(Release.self, from: data)
+            let remoteVersion = release.tagName.trimmingCharacters(in: CharacterSet(charactersIn: "v"))
+
+            let releaseURL = URL(string: release.htmlUrl)
+                ?? URL(string: "https://github.com/sevmorris/Barkeep/releases")!
+            let downloadURL = release.assets.first(where: { $0.name.hasSuffix(".dmg") })
+                .flatMap { URL(string: $0.browserDownloadUrl) }
+                ?? releaseURL
+
+            if remoteVersion.compare(currentVersion, options: .numeric) == .orderedDescending {
+                return .available(version: remoteVersion, downloadURL: downloadURL, releaseURL: releaseURL)
+            } else {
+                return .upToDate(version: currentVersion)
             }
-
-            let remoteVersion = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
-            guard isNewer(remoteVersion, than: currentVersion) else { return nil }
-
-            return AvailableUpdate(version: remoteVersion, downloadURL: releasesURL)
         } catch {
-            updateLog.error("UpdateChecker: version check failed: \(error.localizedDescription, privacy: .public)")
-            return nil
+            updateLog.error("UpdateChecker: \(error.localizedDescription, privacy: .public)")
+            return .error(error.localizedDescription)
         }
     }
+}
 
-    private func isNewer(_ remote: String, than current: String) -> Bool {
-        let toInts = { (v: String) in v.split(separator: ".").compactMap { Int($0) } }
-        let r = toInts(remote)
-        let c = toInts(current)
-        for i in 0..<max(r.count, c.count) {
-            let rv = i < r.count ? r[i] : 0
-            let cv = i < c.count ? c[i] : 0
-            if rv != cv { return rv > cv }
+/// Show an update dialog. When `silent` is true (launch check), only shows UI if an update
+/// is available. Pass `appState` to keep the toolbar badge in sync.
+@MainActor @discardableResult
+func checkForUpdates(silent: Bool = false, appState: AppState? = nil) async -> AvailableUpdate? {
+    let result = await UpdateChecker.shared.check()
+
+    switch result {
+    case .upToDate(let version):
+        appState?.availableUpdate = nil
+        guard !silent else { return nil }
+        let alert = NSAlert()
+        alert.messageText = "You're up to date"
+        alert.informativeText = "Barkeep \(version) is the latest version."
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+        return nil
+
+    case .available(let version, let downloadURL, let releaseURL):
+        let update = AvailableUpdate(version: version, downloadURL: downloadURL, releaseURL: releaseURL)
+        appState?.availableUpdate = update
+        let alert = NSAlert()
+        alert.messageText = "Update Available"
+        alert.informativeText = "Barkeep \(version) is available."
+        alert.addButton(withTitle: "Download")
+        alert.addButton(withTitle: "Release Notes")
+        alert.addButton(withTitle: "Not Now")
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            NSWorkspace.shared.open(downloadURL)
+        } else if response == .alertSecondButtonReturn {
+            NSWorkspace.shared.open(releaseURL)
         }
-        return false
+        return update
+
+    case .error(let message):
+        guard !silent else { return nil }
+        let alert = NSAlert()
+        alert.messageText = "Update Check Failed"
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+        return nil
     }
 }

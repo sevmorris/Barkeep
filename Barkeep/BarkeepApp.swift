@@ -11,7 +11,7 @@ struct BarkeepApp: App {
                 .environment(appState)
                 .task {
                     try? await Task.sleep(for: .seconds(2))
-                    appState.availableUpdate = await UpdateChecker.shared.checkForUpdate()
+                    await checkForUpdates(silent: true, appState: appState)
                 }
         }
         .commands {
@@ -22,6 +22,12 @@ struct BarkeepApp: App {
                 .keyboardShortcut("?", modifiers: .command)
             }
 
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") {
+                    Task { await checkForUpdates(silent: false, appState: appState) }
+                }
+            }
+
             CommandGroup(after: .newItem) {
                 Button("Choose Brewfile…") {
                     appState.showBrewfilePicker = true
@@ -29,7 +35,6 @@ struct BarkeepApp: App {
                 .keyboardShortcut("O", modifiers: .command)
 
                 Button("Refresh") {
-                    // Trigger via notification so RootContentView can handle it
                     NotificationCenter.default.post(name: .barkeepRefresh, object: nil)
                 }
                 .keyboardShortcut("R", modifiers: .command)

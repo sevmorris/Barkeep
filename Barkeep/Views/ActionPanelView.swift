@@ -168,8 +168,12 @@ struct ActionPanelView: View {
                 log.append(line, level: level)
             }
             log.append("Done.")
-            // Refresh outdated list after upgrade/install/uninstall
             await brewfileVM.refreshOutdated()
+            let verb = args.first ?? "operation"
+            let name = args.last ?? ""
+            await NotificationService.showCompletionNotification(
+                operation: "\(verb.capitalized) \(name) complete."
+            )
         } catch {
             log.append("Error: \(error.localizedDescription)", level: .error)
             onError(error.localizedDescription)
