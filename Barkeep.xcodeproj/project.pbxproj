@@ -25,6 +25,7 @@
 		8A735375C6DA32A33FFE4775 /* MigratableApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CEB947E5B260E4DA426017E /* MigratableApp.swift */; };
 		911F6E689C64678B8E360648 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1515D8935F4133FF1B61B619 /* NotificationService.swift */; };
 		B3744A81C87FEC15964DDD3B /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 355D2976517975C5C3DFB5F4 /* EmptyStateView.swift */; };
+		B8A43841BD388FFBAA5BB6E4 /* BrewfileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D03CAAC2AD8ABC48B6735C0 /* BrewfileWatcher.swift */; };
 		B9F2FB5593D6A16FDE59017A /* BundleUntrackedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0056F729A437FDE179BB139E /* BundleUntrackedView.swift */; };
 		C4656E342AE6533608EC7CA1 /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F82D09D0DD9B0F504FFB30A0 /* HelpView.swift */; };
 		CAB052BE87B0ED51C5ABAD30 /* PackageDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEE6AE3145AE914E677A2790 /* PackageDetailView.swift */; };
@@ -49,6 +50,7 @@
 		0056F729A437FDE179BB139E /* BundleUntrackedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleUntrackedView.swift; sourceTree = "<group>"; };
 		0764E78129A603E82C68CC96 /* RootContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootContentView.swift; sourceTree = "<group>"; };
 		076800E1FB5750216D1A8DAF /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		0D03CAAC2AD8ABC48B6735C0 /* BrewfileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrewfileWatcher.swift; sourceTree = "<group>"; };
 		11BA47C5F82AE0F34D764EE1 /* BrewfileListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrewfileListView.swift; sourceTree = "<group>"; };
 		1515D8935F4133FF1B61B619 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		323079A45F04FAB3BF147CEA /* BarkeepApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarkeepApp.swift; sourceTree = "<group>"; };
@@ -90,6 +92,7 @@
 			isa = PBXGroup;
 			children = (
 				A853DBC4A3DD73EF8283177D /* BrewfileParser.swift */,
+				0D03CAAC2AD8ABC48B6735C0 /* BrewfileWatcher.swift */,
 				85BDDD39E42E960B6477CCE2 /* BrewRunner.swift */,
 				1515D8935F4133FF1B61B619 /* NotificationService.swift */,
 				830CF38139D96D05EA9DDD57 /* UpdateChecker.swift */,
@@ -268,6 +271,7 @@
 				F4C2F27C403B7AB90BDB5AF0 /* BrewfileParser.swift in Sources */,
 				5096AED61DD9B180B69000C5 /* BrewfilePickerView.swift in Sources */,
 				F2069600C7982A1AD7D7084B /* BrewfileViewModel.swift in Sources */,
+				B8A43841BD388FFBAA5BB6E4 /* BrewfileWatcher.swift in Sources */,
 				B9F2FB5593D6A16FDE59017A /* BundleUntrackedView.swift in Sources */,
 				08F2B45CA8EFD9F17870BC98 /* ConsoleView.swift in Sources */,
 				B3744A81C87FEC15964DDD3B /* EmptyStateView.swift in Sources */,

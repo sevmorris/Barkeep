@@ -14,6 +14,7 @@ struct RootContentView: View {
     @State private var showAdopt = false
     @State private var consoleHeight: CGFloat = 170
     @State private var consoleDragStart: CGFloat? = nil
+    @State private var brewfileWatcher = BrewfileWatcher()
 
     private static let consoleMinHeight: CGFloat = 80
     private static let consoleMaxHeight: CGFloat = 600
@@ -32,11 +33,15 @@ struct RootContentView: View {
             }
         }
         .onChange(of: appState.brewfilePath) { _, url in
-            guard let url else { return }
+            guard let url else { brewfileWatcher.stop(); return }
             brewfileVM.load(from: url)
+            brewfileWatcher.start(url: url)
         }
         .onAppear {
-            if let url = appState.brewfilePath { brewfileVM.load(from: url) }
+            if let url = appState.brewfilePath {
+                brewfileVM.load(from: url)
+                brewfileWatcher.start(url: url)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .barkeepRefresh)) { _ in
             if let url = appState.brewfilePath { brewfileVM.load(from: url) }
