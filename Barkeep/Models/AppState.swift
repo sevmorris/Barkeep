@@ -15,12 +15,9 @@ final class AppState {
         didSet {
             let ud = UserDefaults.standard
             if let url = brewfilePath {
-                // Prefer a security-scoped bookmark (sandbox-ready); fall back to plain bookmark.
-                let bookmark = (try? url.bookmarkData(options: .withSecurityScope,
-                                                       includingResourceValuesForKeys: nil,
-                                                       relativeTo: nil))
-                            ?? (try? url.bookmarkData())
-                if let bookmark {
+                // App isn't sandboxed — plain bookmarks are enough to
+                // remember the path across launches.
+                if let bookmark = try? url.bookmarkData() {
                     ud.set(bookmark, forKey: Keys.brewfileBookmark)
                 } else {
                     ud.removeObject(forKey: Keys.brewfileBookmark)
@@ -40,10 +37,17 @@ final class AppState {
 
         if let bookmark = ud.data(forKey: Keys.brewfileBookmark) {
             var isStale = false
-            if let url = try? URL(resolvingBookmarkData: bookmark,
-                                  options: .withSecurityScope,
-                                  relativeTo: nil,
-                                  bookmarkDataIsStale: &isStale), !isStale {
+            // Accept both formats — earlier builds saved security-scoped
+            // bookmarks even though the app isn't sandboxed. Try plain
+            // first, fall back to security-scoped for upgraders.
+            let url = (try? URL(resolvingBookmarkData: bookmark,
+                                relativeTo: nil,
+                                bookmarkDataIsStale: &isStale))
+                ?? (try? URL(resolvingBookmarkData: bookmark,
+                             options: .withSecurityScope,
+                             relativeTo: nil,
+                             bookmarkDataIsStale: &isStale))
+            if let url, !isStale {
                 brewfilePath = url
             } else {
                 ud.removeObject(forKey: Keys.brewfileBookmark)
