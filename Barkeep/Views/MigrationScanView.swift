@@ -17,9 +17,17 @@ struct MigrationScanView: View {
                     .font(.headline)
                 Spacer()
                 if !isScanning && !apps.isEmpty {
-                    Text("\(apps.filter(\.selected).count) of \(apps.count) selected")
+                    let selected = apps.filter(\.selected).count
+                    Button("All")  { setAll(true) }
+                        .buttonStyle(.borderless)
+                        .disabled(selected == apps.count)
+                    Button("None") { setAll(false) }
+                        .buttonStyle(.borderless)
+                        .disabled(selected == 0)
+                    Text("\(selected) of \(apps.count)")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                        .monospacedDigit()
                 }
             }
             .padding()
@@ -106,5 +114,9 @@ struct MigrationScanView: View {
         for app in apps where app.selected {
             brewfileVM.add(name: app.caskToken, kind: .cask, section: "Migrated", brewfileURL: brewfileURL)
         }
+    }
+
+    private func setAll(_ value: Bool) {
+        for i in apps.indices { apps[i].selected = value }
     }
 }

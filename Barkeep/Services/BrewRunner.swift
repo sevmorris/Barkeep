@@ -219,6 +219,16 @@ actor BrewRunner {
             .sorted()
     }
 
+    /// Only formulae the user explicitly installed — drops transitive
+    /// dependencies that were pulled in automatically.
+    func listRequestedFormulae() async throws -> [String] {
+        let out = try await capture(["list", "--formula", "--full-name", "--installed-on-request"])
+        return out.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .sorted()
+    }
+
     func listCasks() async throws -> [String] {
         let out = try await capture(["list", "--cask"])
         return out.components(separatedBy: "\n")

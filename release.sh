@@ -169,9 +169,11 @@ gh release create "$TAG" "$DMG" \
 ok "Release published"
 
 # ── Remove old releases ───────────────────────────────────────────────────────
+# Keep the current release and the most-recent prior release; delete the rest.
 step "Removing old releases"
-OLD_TAGS=$(gh release list --repo "$REPO" --limit 100 --json tagName \
-    --jq '.[].tagName' | grep -v "^${TAG}$" || true)
+ALL_TAGS=$(gh release list --repo "$REPO" --limit 100 --json tagName,createdAt \
+    --jq 'sort_by(.createdAt) | reverse | .[].tagName')
+OLD_TAGS=$(echo "$ALL_TAGS" | tail -n +3)
 if [[ -z "$OLD_TAGS" ]]; then
     ok "No old releases to remove"
 else

@@ -10,6 +10,13 @@ struct RootContentView: View {
     @State private var showConsole = false
     @State private var alertMessage: String? = nil
     @State private var showMigrationScan = false
+    @State private var showCleanup = false
+    @State private var showAdopt = false
+    @State private var consoleHeight: CGFloat = 170
+    @State private var consoleDragStart: CGFloat? = nil
+
+    private static let consoleMinHeight: CGFloat = 80
+    private static let consoleMaxHeight: CGFloat = 600
 
     private enum SidebarTab { case brewfile, installed }
 
@@ -34,6 +41,21 @@ struct RootContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .barkeepRefresh)) { _ in
             if let url = appState.brewfilePath { brewfileVM.load(from: url) }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .barkeepInstallMissing)) { _ in
+            Task { await runBundleInstall() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .barkeepCleanupUntracked)) { _ in
+            guard !isRunning, appState.brewfilePath != nil else { return }
+            showCleanup = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .barkeepAdoptUntracked)) { _ in
+            guard appState.brewfilePath != nil else { return }
+            showAdopt = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .barkeepMigrationScan)) { _ in
+            guard appState.brewfilePath != nil else { return }
+            showMigrationScan = true
+        }
         .onChange(of: sidebarTab) { _, tab in
             if tab == .installed {
                 Task { await installedVM.load(brewfileEntries: brewfileVM.allEntries) }
@@ -42,6 +64,18 @@ struct RootContentView: View {
         .sheet(isPresented: $showMigrationScan) {
             if let url = appState.brewfilePath {
                 MigrationScanView(brewfileVM: brewfileVM, brewfileURL: url)
+            }
+        }
+        .sheet(isPresented: $showCleanup) {
+            BundleUntrackedView(mode: .cleanup, brewfileVM: brewfileVM) { selected in
+                Task { await runCleanup(selected) }
+            }
+        }
+        .sheet(isPresented: $showAdopt) {
+            if let url = appState.brewfilePath {
+                BundleUntrackedView(mode: .adopt, brewfileVM: brewfileVM) { selected in
+                    adoptIntoBrewfile(selected, brewfileURL: url)
+                }
             }
         }
         .alert("Error", isPresented: Binding(
@@ -88,9 +122,9 @@ struct RootContentView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                     if showConsole {
-                        Divider()
+                        consoleResizeHandle
                         ConsoleView(log: log)
-                            .frame(height: 170)
+                            .frame(height: consoleHeight)
                     }
                 }
 
@@ -173,9 +207,42 @@ struct RootContentView: View {
                 withAnimation(.easeInOut(duration: 0.2)) { showConsole.toggle() }
             }
 
-            toolbarButton(icon: "arrow.right.arrow.left.square", help: "Scan for migratable apps") {
-                showMigrationScan = true
+            Menu {
+                Button {
+                    Task { await runBundleInstall() }
+                } label: {
+                    Label("Install Missing", systemImage: "arrow.down.app")
+                }
+                .disabled(isRunning)
+
+                Button {
+                    showAdopt = true
+                } label: {
+                    Label("Add Untracked to Brewfile…", systemImage: "plus.square.on.square")
+                }
+
+                Button {
+                    showCleanup = true
+                } label: {
+                    Label("Cleanup Untracked…", systemImage: "trash")
+                }
+                .disabled(isRunning)
+
+                Divider()
+
+                Button {
+                    showMigrationScan = true
+                } label: {
+                    Label("Scan for Migratable Apps", systemImage: "arrow.right.arrow.left.square")
+                }
+            } label: {
+                Image(systemName: "square.stack.3d.up")
+                    .foregroundStyle(.secondary)
             }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Bundle actions")
 
             toolbarButton(icon: "arrow.clockwise", help: "Refresh") {
                 guard let url = appState.brewfilePath else { return }
@@ -234,6 +301,32 @@ struct RootContentView: View {
         PackageDetailView(package: display)
     }
 
+    // MARK: - Console resize handle
+
+    /// Thin draggable strip above the console. Drag up to grow, down to shrink.
+    private var consoleResizeHandle: some View {
+        ZStack {
+            Divider()
+            Rectangle()
+                .fill(Color.clear)
+                .contentShape(Rectangle())
+                .frame(height: 6)
+                .onHover { hovering in
+                    if hovering { NSCursor.resizeUpDown.push() } else { NSCursor.pop() }
+                }
+                .gesture(
+                    DragGesture(coordinateSpace: .global)
+                        .onChanged { value in
+                            if consoleDragStart == nil { consoleDragStart = consoleHeight }
+                            let proposed = (consoleDragStart ?? consoleHeight) - value.translation.height
+                            consoleHeight = min(max(proposed, Self.consoleMinHeight), Self.consoleMaxHeight)
+                        }
+                        .onEnded { _ in consoleDragStart = nil }
+                )
+        }
+        .frame(height: 6)
+    }
+
     // MARK: - Helpers
 
     @ViewBuilder
@@ -249,5 +342,82 @@ struct RootContentView: View {
         }
         .buttonStyle(.plain)
         .help(help)
+    }
+
+    // MARK: - Bundle commands
+
+    /// Run `brew bundle install --file=<path>`. Idempotent — installs whatever's
+    /// missing and skips what's already present.
+    private func runBundleInstall() async {
+        guard !isRunning, let url = appState.brewfilePath else { return }
+        showConsole = true
+        await runStreaming(
+            ["bundle", "install", "--file=\(url.path)"],
+            successMessage: "Brewfile install complete."
+        )
+        if let url = appState.brewfilePath { brewfileVM.load(from: url) }
+    }
+
+    /// Add the selected untracked packages to the Brewfile under "Adopted".
+    private func adoptIntoBrewfile(
+        _ selected: [(name: String, kind: PackageKind)],
+        brewfileURL: URL
+    ) {
+        for (name, kind) in selected {
+            brewfileVM.add(name: name, kind: kind, section: "Adopted", brewfileURL: brewfileURL)
+        }
+    }
+
+    /// Uninstall the selected untracked packages one by one, streaming output.
+    private func runCleanup(_ selected: [(name: String, kind: PackageKind)]) async {
+        guard !isRunning, !selected.isEmpty else { return }
+        showConsole = true
+        isRunning = true
+        log.clear()
+
+        var failures: [String] = []
+        for (name, kind) in selected {
+            var args = ["uninstall"]
+            if kind == .cask { args.append("--cask") }
+            args.append(name)
+            log.append("$ brew " + args.joined(separator: " "))
+            do {
+                try await BrewRunner.shared.run(args) { @MainActor line, level in
+                    log.append(line, level: level)
+                }
+            } catch {
+                log.append("Error: \(error.localizedDescription)", level: .error)
+                failures.append(name)
+            }
+        }
+
+        let removed = selected.count - failures.count
+        log.append("Done. Removed \(removed) of \(selected.count) packages.")
+        await brewfileVM.refreshOutdated()
+        await NotificationService.showCompletionNotification(
+            operation: "Cleanup complete — removed \(removed) of \(selected.count)."
+        )
+        if !failures.isEmpty {
+            alertMessage = "Failed to uninstall: \(failures.joined(separator: ", "))"
+        }
+        isRunning = false
+    }
+
+    /// Shared streaming runner used for toolbar-level brew commands.
+    private func runStreaming(_ args: [String], successMessage: String) async {
+        isRunning = true
+        log.clear()
+        log.append("$ brew " + args.joined(separator: " "))
+        do {
+            try await BrewRunner.shared.run(args) { @MainActor line, level in
+                log.append(line, level: level)
+            }
+            log.append(successMessage)
+            await NotificationService.showCompletionNotification(operation: successMessage)
+        } catch {
+            log.append("Error: \(error.localizedDescription)", level: .error)
+            alertMessage = error.localizedDescription
+        }
+        isRunning = false
     }
 }

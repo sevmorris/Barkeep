@@ -101,6 +101,17 @@ struct BrewfileParserTests {
         #expect(entries[0].section == "Core")
         #expect(entries[1].section == "Apps")
     }
+
+    @Test("Entry IDs are stable across reparse so selection survives refresh")
+    func stableEntryIDs() {
+        let input = """
+        brew "git"
+        cask "firefox"
+        """
+        let firstIDs  = BrewfileParser.entries(from: BrewfileParser.parse(string: input)).map(\.id)
+        let secondIDs = BrewfileParser.entries(from: BrewfileParser.parse(string: input)).map(\.id)
+        #expect(firstIDs == secondIDs)
+    }
 }
 
 // MARK: - Version comparison

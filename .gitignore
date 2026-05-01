@@ -22,5 +22,8 @@ DerivedData/
 # Release artifacts
 *.dmg
 
+# Test coverage
+*.profraw
+
 # Claude
 .claude/

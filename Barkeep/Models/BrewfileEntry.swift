@@ -18,14 +18,17 @@ enum BrewfileNode {
 }
 
 struct BrewfileEntry: Identifiable, Hashable {
-    let id: UUID
+    /// Stable across reparse so SwiftUI selection survives a refresh.
+    /// A Brewfile with two `brew "git"` lines is malformed; `add()` blocks
+    /// duplicates and the parser only ever produces one entry per kind+name.
+    var id: String { "\(kind.rawValue):\(name)" }
+
     var name: String
     var kind: PackageKind
     var section: String    // the comment header in effect when this entry was parsed
     var rawLine: String    // original text — used for write-back
 
     init(name: String, kind: PackageKind, section: String, rawLine: String) {
-        self.id      = UUID()
         self.name    = name
         self.kind    = kind
         self.section = section
