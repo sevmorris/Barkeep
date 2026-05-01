@@ -526,6 +526,11 @@ actor BrewRunner {
     private func parseManPage(_ raw: String) -> [ManSection] {
         // Sections we care about, in display order
         let wantedTitles = ["NAME", "SYNOPSIS", "DESCRIPTION"]
+        // Cap each section. SwiftUI's Text with .fixedSize lays out the full
+        // intrinsic height on the main thread; tools like rclone have ~3MB
+        // man pages that beachball the UI. 8 KB is more than any reader
+        // wants in the detail panel — they can `man <name>` for the full text.
+        let perSectionCap = 8_000
 
         var sections: [(title: String, lines: [String])] = []
         var currentTitle = ""
@@ -556,12 +561,29 @@ actor BrewRunner {
         return sections
             .filter { wantedTitles.contains($0.title) }
             .compactMap { s -> ManSection? in
-                let content = s.lines
+                let full = s.lines
                     .joined(separator: "\n")
                     .trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !content.isEmpty else { return nil }
+                guard !full.isEmpty else { return nil }
+                let content = full.count > perSectionCap
+                    ? String(full.prefix(perSectionCap)) + "\n…\n(truncated — run `man \(processName(from: s.lines))` for the full page)"
+                    : full
                 return ManSection(title: s.title, content: content)
             }
+    }
+
+    /// Best-effort extraction of the page name from a man-page section's
+    /// raw lines, just so the truncation hint can suggest the exact command.
+    private func processName(from lines: [String]) -> String {
+        // NAME section line typically reads: "       toolname - one-line desc"
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if let dashIdx = trimmed.firstIndex(of: "-") {
+                let head = trimmed[..<dashIdx].trimmingCharacters(in: .whitespaces)
+                if !head.isEmpty { return head }
+            }
+        }
+        return ""
     }
 
     // MARK: - Reverse dependencies
