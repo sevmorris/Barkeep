@@ -250,6 +250,15 @@ actor BrewRunner {
             .sorted()
     }
 
+    /// Active taps from `brew tap`.
+    func listTaps() async throws -> Set<String> {
+        let out = try await capture(["tap"])
+        let taps = out.components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        return Set(taps)
+    }
+
     /// Only formulae the user explicitly installed — drops transitive
     /// dependencies that were pulled in automatically.
     func listRequestedFormulae() async throws -> [String] {

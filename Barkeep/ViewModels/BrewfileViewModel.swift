@@ -11,6 +11,7 @@ final class BrewfileViewModel {
     var isLoadingDetail = false
     var filterText = ""
     var outdatedNames: Set<String> = []
+    var activeTaps: Set<String> = []
 
     private var undoStack: [[BrewfileNode]] = []
     private var redoStack: [[BrewfileNode]] = []
@@ -64,6 +65,7 @@ final class BrewfileViewModel {
         }
         isLoading = false
         Task { await refreshOutdated() }
+        Task { await refreshTaps() }
     }
 
     /// Refresh outdated names, filtered to Brewfile entries only.
@@ -71,6 +73,12 @@ final class BrewfileViewModel {
         let allOutdated = await BrewRunner.shared.outdatedNames()
         let brewfileNames = Set(allEntries.map(\.name))
         outdatedNames = allOutdated.intersection(brewfileNames)
+    }
+
+    /// Refresh the set of currently active taps so the action panel can
+    /// show Tap vs Untap accurately.
+    func refreshTaps() async {
+        activeTaps = (try? await BrewRunner.shared.listTaps()) ?? []
     }
 
     // MARK: - On-demand detail

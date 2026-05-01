@@ -89,6 +89,43 @@ struct ActionPanelView: View {
 
     @ViewBuilder
     private func singleBrewfileActions(entry: BrewfileEntry) -> some View {
+        if entry.kind == .tap {
+            tapActions(entry: entry)
+        } else {
+            packageActions(entry: entry)
+        }
+    }
+
+    @ViewBuilder
+    private func tapActions(entry: BrewfileEntry) -> some View {
+        let isActive = brewfileVM.activeTaps.contains(entry.name)
+        if isActive {
+            Text("Tap is active.")
+                .font(.footnote)
+                .foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            actionButton("Untap", icon: "minus.circle", role: .destructive) {
+                Task { await runBrew(["untap", entry.name]) }
+            }
+        } else {
+            Text("Tap is not active.")
+                .font(.footnote)
+                .foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            actionButton("Tap", icon: "arrow.down.circle") {
+                Task { await runBrew(["tap", entry.name]) }
+            }
+        }
+
+        Divider().padding(.vertical, 2)
+
+        actionButton("Remove from Brewfile", icon: "minus.circle", role: .destructive) {
+            brewfileVM.remove(entry: entry, brewfileURL: brewfilePath)
+        }
+    }
+
+    @ViewBuilder
+    private func packageActions(entry: BrewfileEntry) -> some View {
         if brewfileVM.outdatedNames.contains(entry.name) {
             actionButton("Upgrade", icon: "arrow.up.circle.fill", tint: .orange) {
                 Task { await runBrew(["upgrade", entry.name]) }
@@ -296,6 +333,9 @@ struct ActionPanelView: View {
             log.append("Done.")
             await brewfileVM.refreshOutdated()
             let verb = args.first ?? "operation"
+            if verb == "tap" || verb == "untap" {
+                await brewfileVM.refreshTaps()
+            }
             await NotificationService.showCompletionNotification(
                 operation: "\(verb.capitalized) complete (\(names.count) package\(names.count == 1 ? "" : "s"))."
             )
