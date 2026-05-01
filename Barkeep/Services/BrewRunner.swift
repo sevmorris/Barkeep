@@ -577,28 +577,19 @@ actor BrewRunner {
 
     // MARK: - tldr
 
-    /// Fetch and parse tldr examples for a package. Returns empty array if tldr isn't installed
-    /// or no page exists for this package.
+    /// Fetch and parse tldr examples for a package. Returns empty arrays
+    /// if tldr isn't installed or no page exists.
     func tldr(for name: String) async -> (summary: String, examples: [TldrExample]) {
-        guard let tldrPath = ["tldr", "/opt/homebrew/bin/tldr", "/usr/local/bin/tldr"]
-            .first(where: { FileManager.default.isExecutableFile(atPath: $0) ||
-                            ($0 == "tldr" && ProcessInfo.processInfo.environment["PATH"] != nil) })
+        // Locate tldr via PATH — `brewEnvironment()` puts Homebrew on PATH,
+        // so this covers /opt/homebrew/bin/tldr, /usr/local/bin/tldr, and
+        // any custom install.
+        guard let path = (try? await captureRaw("/usr/bin/which", args: ["tldr"]))?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              !path.isEmpty,
+              FileManager.default.isExecutableFile(atPath: path)
         else { return ("", []) }
 
-        // Resolve `tldr` via PATH if needed
-        let execPath: String
-        if tldrPath == "tldr" {
-            execPath = (try? await captureRaw("/usr/bin/which", args: ["tldr"])) ?? ""
-        } else {
-            execPath = tldrPath
-        }
-        guard !execPath.isEmpty, FileManager.default.isExecutableFile(atPath: execPath.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-            return ("", [])
-        }
-
-        guard let raw = try? await captureRaw(execPath.trimmingCharacters(in: .whitespacesAndNewlines),
-                                              args: ["--raw", name])
-        else { return ("", []) }
+        guard let raw = try? await captureRaw(path, args: ["--raw", name]) else { return ("", []) }
 
         return parseTldr(raw)
     }

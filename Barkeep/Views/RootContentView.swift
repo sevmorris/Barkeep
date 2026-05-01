@@ -32,16 +32,10 @@ struct RootContentView: View {
                 mainWindow
             }
         }
-        .onChange(of: appState.brewfilePath) { _, url in
+        .onChange(of: appState.brewfilePath, initial: true) { _, url in
             guard let url else { brewfileWatcher.stop(); return }
             brewfileVM.load(from: url)
             brewfileWatcher.start(url: url)
-        }
-        .onAppear {
-            if let url = appState.brewfilePath {
-                brewfileVM.load(from: url)
-                brewfileWatcher.start(url: url)
-            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .barkeepRefresh)) { _ in
             if let url = appState.brewfilePath { brewfileVM.load(from: url) }
