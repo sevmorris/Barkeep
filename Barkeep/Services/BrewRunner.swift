@@ -29,6 +29,24 @@ private final class ResumeGuard {
     }
 }
 
+/// Lock-protected `Data` buffer — readability handlers and termination
+/// handlers run on background queues independently, so the byte buffer
+/// that aggregates them needs synchronization.
+private final class CaptureBuffer: @unchecked Sendable {
+    private var data = Data()
+    private let lock = NSLock()
+
+    func append(_ chunk: Data) {
+        lock.lock(); defer { lock.unlock() }
+        data.append(chunk)
+    }
+
+    func snapshot() -> Data {
+        lock.lock(); defer { lock.unlock() }
+        return data
+    }
+}
+
 actor BrewRunner {
     static let shared = BrewRunner()
 
@@ -54,11 +72,19 @@ actor BrewRunner {
         infoCache[key] = (pkg, Date())
     }
 
-    private func invalidateCache(names: [String]) {
+    /// Drop cached info for the given names so the next `info(...)` call
+    /// refetches from `brew info`. Call after any install/uninstall/upgrade.
+    func invalidateCache(names: [String]) {
         for name in names {
             infoCache.removeValue(forKey: "\(PackageKind.formula):\(name)")
             infoCache.removeValue(forKey: "\(PackageKind.cask):\(name)")
         }
+    }
+
+    /// Drop every cached info entry — use when we don't know which packages
+    /// were affected (e.g. after `brew bundle install`).
+    func invalidateAllCache() {
+        infoCache.removeAll()
     }
 
     // MARK: - Executable
@@ -87,6 +113,7 @@ actor BrewRunner {
         onOutput: @MainActor @Sendable @escaping (String, LogLevel) -> Void
     ) async throws {
         let brew = try brewExecutable()
+        defer { runningProcess = nil }
 
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let process = Process()
@@ -138,8 +165,6 @@ actor BrewRunner {
                 continuation.resume(throwing: error)
             }
         }
-
-        runningProcess = nil
     }
 
     func cancel() {
@@ -167,21 +192,27 @@ actor BrewRunner {
             let guard_ = ResumeGuard()
             // Read stdout/stderr incrementally to avoid pipe-buffer deadlock
             // on large outputs (e.g. `brew search --cask ""` returns >64KB).
-            nonisolated(unsafe) var stdoutData = Data()
-            nonisolated(unsafe) var stderrData = Data()
+            // The buffers are mutated from background queues — both the
+            // readability handlers and the termination handler — so they
+            // need a lock. CaptureBuffer provides that.
+            let stdoutBuffer = CaptureBuffer()
+            let stderrBuffer = CaptureBuffer()
             outPipe.fileHandleForReading.readabilityHandler = { handle in
-                stdoutData.append(handle.availableData)
+                stdoutBuffer.append(handle.availableData)
             }
             errPipe.fileHandleForReading.readabilityHandler = { handle in
-                stderrData.append(handle.availableData)
+                stderrBuffer.append(handle.availableData)
             }
 
             process.terminationHandler = { p in
                 outPipe.fileHandleForReading.readabilityHandler = nil
                 errPipe.fileHandleForReading.readabilityHandler = nil
-                // Drain any remaining data
-                stdoutData.append(outPipe.fileHandleForReading.readDataToEndOfFile())
+                // Drain any remaining data after detaching handlers
+                stdoutBuffer.append(outPipe.fileHandleForReading.readDataToEndOfFile())
+                stderrBuffer.append(errPipe.fileHandleForReading.readDataToEndOfFile())
                 guard guard_.tryResume() else { return }
+                let stdoutData = stdoutBuffer.snapshot()
+                let stderrData = stderrBuffer.snapshot()
                 if p.terminationStatus == 0 {
                     if !stderrData.isEmpty,
                        let msg = String(data: stderrData, encoding: .utf8),
@@ -574,8 +605,19 @@ actor BrewRunner {
             process.standardOutput = outPipe
             process.standardError = Pipe() // discard
 
+            // Incremental reads — `readDataToEndOfFile()` alone deadlocks on
+            // outputs larger than the pipe buffer (e.g. a long man page).
+            let buffer = CaptureBuffer()
+            outPipe.fileHandleForReading.readabilityHandler = { handle in
+                buffer.append(handle.availableData)
+            }
+
+            let guard_ = ResumeGuard()
             process.terminationHandler = { p in
-                let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+                outPipe.fileHandleForReading.readabilityHandler = nil
+                buffer.append(outPipe.fileHandleForReading.readDataToEndOfFile())
+                guard guard_.tryResume() else { return }
+                let data = buffer.snapshot()
                 if p.terminationStatus == 0 {
                     let result = String(data: data, encoding: .utf8)
                         ?? String(decoding: data, as: UTF8.self)
@@ -584,7 +626,14 @@ actor BrewRunner {
                     continuation.resume(throwing: BrewError.failed(p.terminationStatus))
                 }
             }
-            do { try process.run() } catch { continuation.resume(throwing: error) }
+
+            do {
+                try process.run()
+            } catch {
+                outPipe.fileHandleForReading.readabilityHandler = nil
+                guard guard_.tryResume() else { return }
+                continuation.resume(throwing: error)
+            }
         }
     }
 

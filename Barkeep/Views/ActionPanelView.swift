@@ -167,6 +167,10 @@ struct ActionPanelView: View {
             try await BrewRunner.shared.run(args) { @MainActor line, level in
                 log.append(line, level: level)
             }
+            // Drop cached `brew info` entries for any non-flag arg so the
+            // detail panel re-fetches version, outdated state, etc.
+            let names = args.dropFirst().filter { !$0.hasPrefix("-") }
+            await BrewRunner.shared.invalidateCache(names: Array(names))
             log.append("Done.")
             await brewfileVM.refreshOutdated()
             let verb = args.first ?? "operation"
@@ -209,6 +213,7 @@ struct ActionPanelView: View {
             }
         }
 
+        await BrewRunner.shared.invalidateCache(names: [name])
         await brewfileVM.refreshOutdated()
         // Reload detail so isBrewManaged updates
         if let entry = brewfileVM.selectedEntry {

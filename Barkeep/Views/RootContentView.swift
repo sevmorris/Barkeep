@@ -355,6 +355,8 @@ struct RootContentView: View {
             ["bundle", "install", "--file=\(url.path)"],
             successMessage: "Brewfile install complete."
         )
+        // We don't know which packages got installed — drop everything.
+        await BrewRunner.shared.invalidateAllCache()
         if let url = appState.brewfilePath { brewfileVM.load(from: url) }
     }
 
@@ -385,6 +387,7 @@ struct RootContentView: View {
                 try await BrewRunner.shared.run(args) { @MainActor line, level in
                     log.append(line, level: level)
                 }
+                await BrewRunner.shared.invalidateCache(names: [name])
             } catch {
                 log.append("Error: \(error.localizedDescription)", level: .error)
                 failures.append(name)
