@@ -6,7 +6,7 @@ final class BrewfileViewModel {
     var nodes: [BrewfileNode] = []
     var isLoading = false
     var error: String? = nil
-    var selectedEntry: BrewfileEntry? = nil
+    var selectedEntryIDs: Set<String> = []
     var selectedDetail: BrewPackage? = nil
     var isLoadingDetail = false
     var filterText = ""
@@ -22,6 +22,16 @@ final class BrewfileViewModel {
 
     var allEntries: [BrewfileEntry] {
         BrewfileParser.entries(from: nodes)
+    }
+
+    var selectedEntries: [BrewfileEntry] {
+        let ids = selectedEntryIDs
+        return allEntries.filter { ids.contains($0.id) }
+    }
+
+    /// Single focused entry — present only when exactly one row is selected.
+    var selectedEntry: BrewfileEntry? {
+        selectedEntryIDs.count == 1 ? selectedEntries.first : nil
     }
 
     var sections: [(name: String, entries: [BrewfileEntry])] {
@@ -151,12 +161,18 @@ final class BrewfileViewModel {
     }
 
     func remove(entry: BrewfileEntry, brewfileURL: URL) {
+        remove(entries: [entry], brewfileURL: brewfileURL)
+    }
+
+    func remove(entries: [BrewfileEntry], brewfileURL: URL) {
+        guard !entries.isEmpty else { return }
         pushUndo()
+        let removeIDs = Set(entries.map(\.id))
         nodes.removeAll {
-            if case .entry(let e) = $0 { return e.id == entry.id }
+            if case .entry(let e) = $0 { return removeIDs.contains(e.id) }
             return false
         }
-        if selectedEntry?.id == entry.id { selectedEntry = nil }
+        selectedEntryIDs.subtract(removeIDs)
         save(to: brewfileURL)
     }
 

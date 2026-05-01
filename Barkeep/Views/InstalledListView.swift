@@ -20,16 +20,7 @@ struct InstalledListView: View {
             } else if vm.filteredFormulae.isEmpty && vm.filteredCasks.isEmpty {
                 emptyLabel(vm.filterText.isEmpty ? "No packages found" : "No matches")
             } else {
-                List(selection: Binding(
-                    get: { vm.selectedPackage?.id },
-                    set: { id in
-                        let all = vm.formulae + vm.casks
-                        if let pkg = all.first(where: { $0.id == id }) {
-                            vm.selectedPackage = pkg
-                            Task { await vm.loadDetail(for: pkg) }
-                        }
-                    }
-                )) {
+                List(selection: $vm.selectedPackageIDs) {
                     if !vm.filteredFormulae.isEmpty {
                         Section("Formulae (\(vm.filteredFormulae.count))") {
                             ForEach(vm.filteredFormulae) { pkg in

@@ -7,7 +7,7 @@ final class InstalledViewModel {
     var casks: [BrewPackage] = []
     var isLoading = false
     var error: String? = nil
-    var selectedPackage: BrewPackage? = nil
+    var selectedPackageIDs: Set<String> = []
     var filterText = ""
 
     // MARK: - Computed
@@ -24,6 +24,16 @@ final class InstalledViewModel {
 
     var untrackedCount: Int {
         (formulae + casks).filter { !$0.isInBrewfile }.count
+    }
+
+    var selectedPackages: [BrewPackage] {
+        let ids = selectedPackageIDs
+        return (formulae + casks).filter { ids.contains($0.id) }
+    }
+
+    /// Single focused package — present only when exactly one row is selected.
+    var selectedPackage: BrewPackage? {
+        selectedPackageIDs.count == 1 ? selectedPackages.first : nil
     }
 
     // MARK: - Load
@@ -81,20 +91,14 @@ final class InstalledViewModel {
         info.reverseDependencies = usesResult
 
         updatePackage(name: package.name, kind: package.kind) { _ in info }
-        if selectedPackage?.name == package.name {
-            selectedPackage = package.kind == .formula
-                ? formulae.first { $0.name == package.name }
-                : casks.first    { $0.name == package.name }
-        }
     }
 
     // MARK: - Mutations
 
     func markInBrewfile(name: String, kind: PackageKind, inBrewfile: Bool) {
+        // selectedPackage is computed from the underlying arrays, so updating
+        // the array here is enough — no second assignment needed.
         updatePackage(name: name, kind: kind) { $0.with(isInBrewfile: inBrewfile) }
-        if selectedPackage?.name == name {
-            selectedPackage = selectedPackage?.with(isInBrewfile: inBrewfile)
-        }
     }
 
     // MARK: - Private

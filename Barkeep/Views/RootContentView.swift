@@ -66,6 +66,19 @@ struct RootContentView: View {
                 Task { await installedVM.load(brewfileEntries: brewfileVM.allEntries) }
             }
         }
+        .onChange(of: brewfileVM.selectedEntryIDs) { _, _ in
+            if let entry = brewfileVM.selectedEntry {
+                Task { await brewfileVM.loadDetail(for: entry) }
+            } else {
+                brewfileVM.selectedDetail = nil
+                brewfileVM.isLoadingDetail = false
+            }
+        }
+        .onChange(of: installedVM.selectedPackageIDs) { _, _ in
+            if let pkg = installedVM.selectedPackage {
+                Task { await installedVM.loadDetail(for: pkg) }
+            }
+        }
         .sheet(isPresented: $showMigrationScan) {
             if let url = appState.brewfilePath {
                 MigrationScanView(brewfileVM: brewfileVM, brewfileURL: url)
@@ -137,13 +150,13 @@ struct RootContentView: View {
 
                 if let brewfilePath = appState.brewfilePath {
                     ActionPanelView(
-                        brewfileVM:      brewfileVM,
-                        installedVM:     installedVM,
-                        installedPackage: sidebarTab == .installed ? installedVM.selectedPackage : nil,
-                        log:             log,
-                        isRunning:       $isRunning,
-                        onError:         { alertMessage = $0 },
-                        brewfilePath:    brewfilePath
+                        brewfileVM:   brewfileVM,
+                        installedVM:  installedVM,
+                        mode:         sidebarTab == .installed ? .installed : .brewfile,
+                        log:          log,
+                        isRunning:    $isRunning,
+                        onError:      { alertMessage = $0 },
+                        brewfilePath: brewfilePath
                     )
                     .frame(width: 220)
                 }
@@ -268,11 +281,17 @@ struct RootContentView: View {
     @ViewBuilder
     private var detailPanel: some View {
         if sidebarTab == .installed {
-            if let pkg = installedVM.selectedPackage {
+            if installedVM.selectedPackages.count > 1 {
+                MultiSelectSummary(count: installedVM.selectedPackages.count,
+                                   names: installedVM.selectedPackages.map(\.name))
+            } else if let pkg = installedVM.selectedPackage {
                 PackageDetailView(package: pkg)
             } else {
                 EmptyStateView()
             }
+        } else if brewfileVM.selectedEntries.count > 1 {
+            MultiSelectSummary(count: brewfileVM.selectedEntries.count,
+                               names: brewfileVM.selectedEntries.map(\.name))
         } else if let entry = brewfileVM.selectedEntry {
             if brewfileVM.isLoadingDetail {
                 ProgressView()
