@@ -112,6 +112,86 @@ struct BrewfileParserTests {
         let secondIDs = BrewfileParser.entries(from: BrewfileParser.parse(string: input)).map(\.id)
         #expect(firstIDs == secondIDs)
     }
+
+    @Test("commentBody trims leading # and surrounding whitespace")
+    func commentBody() {
+        #expect(BrewfileParser.commentBody("#  Apps  ") == "Apps")
+        #expect(BrewfileParser.commentBody("# Dev Tools") == "Dev Tools")
+        #expect(BrewfileParser.commentBody("not a comment") == "")
+        #expect(BrewfileParser.commentBody("#") == "")
+    }
+
+    @Test("resection rederives entry.section from current comment headers")
+    func resectionUpdatesEntries() {
+        let input = """
+        # Old
+        brew "git"
+        """
+        var nodes = BrewfileParser.parse(string: input)
+        // Hand-mutate the comment line as a rename would
+        for i in nodes.indices {
+            if case .comment = nodes[i] { nodes[i] = .comment("# New") }
+        }
+        let resected = BrewfileParser.resection(nodes)
+        #expect(BrewfileParser.entries(from: resected).first?.section == "New")
+    }
+}
+
+@Suite("BrewfileViewModel section mutations")
+struct BrewfileViewModelSectionTests {
+
+    @Test("renameSection updates header and entry sections")
+    @MainActor func renameSection() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Brewfile-rename-\(UUID().uuidString)")
+        let initial = "# Dev\nbrew \"git\"\n# Apps\ncask \"firefox\"\n"
+        try initial.write(to: url, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let vm = BrewfileViewModel()
+        vm.load(from: url)
+        vm.renameSection(from: "Dev", to: "Tools", brewfileURL: url)
+
+        #expect(vm.allEntries.first(where: { $0.name == "git" })?.section == "Tools")
+        let written = try String(contentsOf: url, encoding: .utf8)
+        #expect(written.contains("# Tools"))
+        #expect(!written.contains("# Dev"))
+    }
+
+    @Test("move shifts entries to the target section")
+    @MainActor func moveBetweenSections() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Brewfile-move-\(UUID().uuidString)")
+        let initial = "# Dev\nbrew \"git\"\n# Apps\ncask \"firefox\"\n"
+        try initial.write(to: url, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let vm = BrewfileViewModel()
+        vm.load(from: url)
+        let git = vm.allEntries.first { $0.name == "git" }!
+        vm.move(entries: [git], to: "Apps", brewfileURL: url)
+
+        #expect(vm.allEntries.first(where: { $0.name == "git" })?.section == "Apps")
+    }
+
+    @Test("deleteSection removes header and its entries")
+    @MainActor func deleteSection() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Brewfile-delete-\(UUID().uuidString)")
+        let initial = "# Dev\nbrew \"git\"\nbrew \"gh\"\n# Apps\ncask \"firefox\"\n"
+        try initial.write(to: url, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let vm = BrewfileViewModel()
+        vm.load(from: url)
+        vm.deleteSection("Dev", brewfileURL: url)
+
+        let names = vm.allEntries.map(\.name)
+        #expect(names == ["firefox"])
+        let written = try String(contentsOf: url, encoding: .utf8)
+        #expect(!written.contains("# Dev"))
+        #expect(written.contains("# Apps"))
+    }
 }
 
 // MARK: - Version comparison

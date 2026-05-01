@@ -15,6 +15,7 @@
 		29203C0BDBE982577FC7204F /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 830CF38139D96D05EA9DDD57 /* UpdateChecker.swift */; };
 		3230E86FAA863D041E311B68 /* BarkeepApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 323079A45F04FAB3BF147CEA /* BarkeepApp.swift */; };
 		32A2BC67E0B737F5DF997527 /* ActionPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A5401537BB31A8BE2B168D9 /* ActionPanelView.swift */; };
+		3B9474CD58AE6729752E4330 /* SectionNameSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B5B4C7EE56FE247E01E6A37 /* SectionNameSheet.swift */; };
 		5096AED61DD9B180B69000C5 /* BrewfilePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BBFAF6524FF818F342A190D /* BrewfilePickerView.swift */; };
 		5240236D547818EFE4C33927 /* RootContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0764E78129A603E82C68CC96 /* RootContentView.swift */; };
 		6A1F072F719FCFFC34ECDEBA /* MigrationScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD8AAC6C5A564C6530CEA36E /* MigrationScanView.swift */; };
@@ -64,6 +65,7 @@
 		5BBFAF6524FF818F342A190D /* BrewfilePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrewfilePickerView.swift; sourceTree = "<group>"; };
 		601F0503F3366DE44BF30B40 /* Barkeep.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Barkeep.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		64EC84129F800151C641CF65 /* InstalledListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstalledListView.swift; sourceTree = "<group>"; };
+		6B5B4C7EE56FE247E01E6A37 /* SectionNameSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionNameSheet.swift; sourceTree = "<group>"; };
 		7438683DB48E09178234F9D8 /* BrewfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrewfileViewModel.swift; sourceTree = "<group>"; };
 		785D7B9CE182339A802885A4 /* InstalledViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstalledViewModel.swift; sourceTree = "<group>"; };
 		830CF38139D96D05EA9DDD57 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
@@ -118,6 +120,7 @@
 				BEE6AE3145AE914E677A2790 /* PackageDetailView.swift */,
 				4EB814FB64C5EFEA1F4BED85 /* PackageRowView.swift */,
 				0764E78129A603E82C68CC96 /* RootContentView.swift */,
+				6B5B4C7EE56FE247E01E6A37 /* SectionNameSheet.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -289,6 +292,7 @@
 				7C2B7BEC58E60A5D41476D56 /* PackageRowView.swift in Sources */,
 				74544E787FE740FDD40A3E36 /* ProcessingLog.swift in Sources */,
 				5240236D547818EFE4C33927 /* RootContentView.swift in Sources */,
+				3B9474CD58AE6729752E4330 /* SectionNameSheet.swift in Sources */,
 				29203C0BDBE982577FC7204F /* UpdateChecker.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

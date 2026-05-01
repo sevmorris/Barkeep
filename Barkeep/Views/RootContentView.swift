@@ -126,7 +126,9 @@ struct RootContentView: View {
                     Divider()
 
                     if sidebarTab == .brewfile {
-                        BrewfileListView(vm: brewfileVM)
+                        if let url = appState.brewfilePath {
+                            BrewfileListView(vm: brewfileVM, brewfileURL: url)
+                        }
                     } else {
                         InstalledListView(vm: installedVM, outdatedNames: brewfileVM.outdatedNames)
                     }

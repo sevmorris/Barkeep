@@ -90,6 +90,22 @@ enum BrewfileParser {
         }
     }
 
+    /// Re-derive `entry.section` from the current comment headers — call
+    /// after mutating comment lines (rename/delete) so entries reflect
+    /// the new section context. Cheap because `parse` is just a regex
+    /// scan; UUIDs survive since `BrewfileEntry.id` is computed.
+    static func resection(_ nodes: [BrewfileNode]) -> [BrewfileNode] {
+        let content = nodes.map { $0.rawLine }.joined(separator: "\n") + "\n"
+        return parse(string: content)
+    }
+
+    /// Body of a `# Foo` comment line, trimmed. Returns empty for `#` alone.
+    static func commentBody(_ rawLine: String) -> String {
+        let trimmed = rawLine.trimmingCharacters(in: .whitespaces)
+        guard trimmed.hasPrefix("#") else { return "" }
+        return String(trimmed.dropFirst()).trimmingCharacters(in: .whitespaces)
+    }
+
     /// Group entries into named sections for display.
     /// Section name is derived from the comment immediately preceding a run of entries.
     static func sections(from nodes: [BrewfileNode]) -> [(name: String, entries: [BrewfileEntry])] {

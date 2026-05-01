@@ -176,6 +176,107 @@ final class BrewfileViewModel {
         save(to: brewfileURL)
     }
 
+    func renameSection(from oldName: String, to newName: String, brewfileURL: URL) {
+        let trimmed = sanitizeSectionName(newName)
+        guard !trimmed.isEmpty, trimmed != oldName else { return }
+        pushUndo()
+
+        var didChange = false
+        for i in nodes.indices {
+            if case .comment(let raw) = nodes[i],
+               BrewfileParser.commentBody(raw) == oldName {
+                nodes[i] = .comment("# \(trimmed)")
+                didChange = true
+            }
+        }
+        guard didChange else { return }
+
+        nodes = BrewfileParser.resection(nodes)
+        save(to: brewfileURL)
+    }
+
+    /// Remove a whole section: drop the header comment AND every entry
+    /// the parser considered part of it.
+    func deleteSection(_ name: String, brewfileURL: URL) {
+        pushUndo()
+
+        var newNodes: [BrewfileNode] = []
+        var skippingHeader = false
+        for node in nodes {
+            switch node {
+            case .comment(let raw):
+                let body = BrewfileParser.commentBody(raw)
+                if body == name {
+                    skippingHeader = true   // drop this header
+                    continue
+                } else if !body.isEmpty {
+                    skippingHeader = false  // entered a different section
+                    newNodes.append(node)
+                } else {
+                    newNodes.append(node)
+                }
+            case .entry(let e):
+                if e.section == name { continue }   // drop entries in deleted section
+                newNodes.append(node)
+            case .blank, .unknown:
+                newNodes.append(node)
+            }
+        }
+        _ = skippingHeader  // value tracked only to mirror parser flow
+
+        nodes = BrewfileParser.resection(newNodes)
+        // Drop selection IDs for entries we removed
+        let liveIDs = Set(allEntries.map(\.id))
+        selectedEntryIDs = selectedEntryIDs.intersection(liveIDs)
+        save(to: brewfileURL)
+    }
+
+    /// Move entries to a target section. Creates the section if it
+    /// doesn't exist. Insertion lands after the last entry of the
+    /// target section, mirroring `add()`.
+    func move(entries: [BrewfileEntry], to section: String, brewfileURL: URL) {
+        let sanitized = sanitizeSectionName(section)
+        guard !sanitized.isEmpty, !entries.isEmpty else { return }
+        pushUndo()
+
+        let moveIDs = Set(entries.map(\.id))
+
+        // Pull the entries out, preserving their original order.
+        var moving: [BrewfileNode] = []
+        var remaining: [BrewfileNode] = []
+        for node in nodes {
+            if case .entry(let e) = node, moveIDs.contains(e.id) {
+                var updated = e
+                updated.section = sanitized
+                moving.append(.entry(updated))
+            } else {
+                remaining.append(node)
+            }
+        }
+
+        // Find the insertion point.
+        let lastEntryIdx = remaining.indices.last(where: {
+            if case .entry(let e) = remaining[$0] { return e.section == sanitized }
+            return false
+        })
+        if let lastEntryIdx {
+            remaining.insert(contentsOf: moving, at: remaining.index(after: lastEntryIdx))
+        } else if let headerIdx = remaining.indices.first(where: {
+            if case .comment(let raw) = remaining[$0] { return BrewfileParser.commentBody(raw) == sanitized }
+            return false
+        }) {
+            remaining.insert(contentsOf: moving, at: remaining.index(after: headerIdx))
+        } else {
+            // No section yet — append a new section block.
+            if !remaining.isEmpty { remaining.append(.blank) }
+            remaining.append(.comment("# \(sanitized)"))
+            remaining.append(contentsOf: moving)
+        }
+
+        nodes = BrewfileParser.resection(remaining)
+        save(to: brewfileURL)
+    }
+
     // MARK: - Private
 
     private func pushUndo() {
