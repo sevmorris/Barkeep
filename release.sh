@@ -90,6 +90,15 @@ xcodebuild \
     -quiet
 ok "Build complete"
 
+# ── Sign ──────────────────────────────────────────────────────────────────────
+step "Codesigning app"
+IDENTITY="Developer ID Application: Seven Morris (T9RLNAXPWU)"
+ENTITLEMENTS="$PROJECT_DIR/Barkeep/Barkeep.entitlements"
+
+# Sign the app bundle with Hardened Runtime
+codesign --force --options runtime --entitlements "$ENTITLEMENTS" --sign "$IDENTITY" "$APP_PATH"
+ok "Codesigning complete"
+
 # ── Verify app version ────────────────────────────────────────────────────────
 step "Verifying built app version"
 BUILT_VERSION=$(defaults read "$APP_PATH/Contents/Info.plist" CFBundleShortVersionString)
@@ -102,9 +111,8 @@ step "Staging DMG contents"
 rm -rf "$STAGING"
 mkdir "$STAGING"
 cp -R "$APP_PATH" "$STAGING/"
-cp "$PROJECT_DIR/README.txt" "$STAGING/"
 ln -s /Applications "$STAGING/Applications"
-ok "App, README.txt, Applications alias"
+ok "App, Applications alias"
 
 # ── Create DMG ────────────────────────────────────────────────────────────────
 step "Creating DMG"
@@ -117,6 +125,13 @@ hdiutil create \
     -o "$DMG" \
     -quiet
 ok "Created $(du -sh $DMG | cut -f1) DMG"
+
+# ── Notarize ──────────────────────────────────────────────────────────────────
+step "Notarizing DMG"
+# Reusing 'WoWoNotary' profile
+xcrun notarytool submit "$DMG" --wait --keychain-profile "WoWoNotary"
+xcrun stapler staple "$DMG"
+ok "Notarization complete"
 
 # ── Verify DMG ────────────────────────────────────────────────────────────────
 step "Verifying DMG contents"
