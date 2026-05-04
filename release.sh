@@ -129,16 +129,17 @@ hdiutil detach "$MOUNT" -quiet
     fail "DMG version mismatch: expected $VERSION, got $DMG_VERSION"
 ok "DMG contains $DMG_VERSION"
 
-# ── Update README download link ───────────────────────────────────────────────
-step "Updating README download link"
+# ── Update docs (README) ─────────────────────────────────────────────────────
+step "Updating README to ${TAG}"
 sed -i '' "s|Barkeep-v[0-9][0-9.]*\.dmg|Barkeep-${TAG}.dmg|g" README.md
 sed -i '' "s|Download v[0-9][0-9.]*|Download ${TAG}|g" README.md
-if [[ -n "$(git diff README.md)" ]]; then
+
+if [[ -n "$(git status --porcelain README.md)" ]]; then
     git add README.md
     git commit -m "docs: update download link to ${TAG}"
     ok "README updated to ${TAG}"
 else
-    ok "README already points to ${TAG} — skipping commit"
+    ok "README already up to date"
 fi
 
 # ── Tag and push ──────────────────────────────────────────────────────────────
