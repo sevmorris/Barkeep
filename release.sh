@@ -67,11 +67,8 @@ if [[ "$CURRENT" == "$VERSION" ]]; then
 else
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$PLIST"
     /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$PLIST"
-    # Keep project.yml in sync (XcodeGen source of truth)
-    sed -i '' "s/CFBundleShortVersionString: .*/CFBundleShortVersionString: \"$VERSION\"/" "$PROJECT_DIR/project.yml"
-    sed -i '' "s/CFBundleVersion: .*/CFBundleVersion: \"$VERSION\"/" "$PROJECT_DIR/project.yml"
     ok "Bumped $CURRENT → $VERSION"
-    git add "$PLIST" "$PROJECT_DIR/project.yml"
+    git add "$PLIST"
     git commit -m "Bump version to $VERSION"
     ok "Committed version bump"
 fi
