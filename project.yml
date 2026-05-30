@@ -35,8 +35,8 @@ targets:
       properties:
         CFBundleName: Barkeep
         CFBundleDisplayName: Barkeep
-        CFBundleShortVersionString: "1.11.3"
-        CFBundleVersion: "1.11.3"
+        CFBundleShortVersionString: "1.11.4"
+        CFBundleVersion: "1.11.4"
         LSApplicationCategoryType: public.app-category.utilities
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
         NSHumanReadableDescription: Homebrew package manager
