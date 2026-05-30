@@ -88,6 +88,7 @@ xcodebuild \
     -configuration Release \
     -derivedDataPath "$DERIVED_DATA" \
     -quiet
+[[ -d "$APP_PATH" ]] || fail "Build did not produce $APP_PATH"
 ok "Build complete"
 
 # ── Sign ──────────────────────────────────────────────────────────────────────
@@ -97,6 +98,7 @@ ENTITLEMENTS="$PROJECT_DIR/Barkeep/Barkeep.entitlements"
 
 # Sign the app bundle with Hardened Runtime
 codesign --force --options runtime --entitlements "$ENTITLEMENTS" --sign "$IDENTITY" "$APP_PATH"
+codesign --verify --deep --strict --verbose=2 "$APP_PATH" 2>&1 | tail -3
 ok "Codesigning complete"
 
 # ── Verify app version ────────────────────────────────────────────────────────
@@ -160,22 +162,28 @@ fi
 # ── Tag and push ──────────────────────────────────────────────────────────────
 step "Tagging and pushing"
 git tag "$TAG"
-git push
-git push origin "$TAG"
-ok "Pushed $TAG"
+# Resolve the tracked remote/branch so this works from any branch (e.g. a
+# worktree branch whose name differs from its upstream).
+UPSTREAM=$(git rev-parse --abbrev-ref '@{upstream}')
+REMOTE="${UPSTREAM%%/*}"
+BRANCH="${UPSTREAM#*/}"
+git push "$REMOTE" "HEAD:$BRANCH"
+git push "$REMOTE" "$TAG"
+ok "Pushed $TAG to $REMOTE/$BRANCH"
 
 # ── GitHub release ────────────────────────────────────────────────────────────
 step "Creating GitHub release"
-PREV_TAG=$(git tag --sort=-creatordate | grep -v "^${TAG}$" | head -1)
+PREV_TAG=$(git tag --sort=-creatordate | grep -v "^${TAG}$" | head -1 || true)
 if [[ -n "$PREV_TAG" ]]; then
     CHANGES=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s" \
         | grep -v "^- Bump version" \
-        | grep -v "^- docs: update download link")
+        | grep -v "^- docs: update download link" || true)
 else
     CHANGES=$(git log --pretty=format:"- %s" \
         | grep -v "^- Bump version" \
-        | grep -v "^- docs: update download link")
+        | grep -v "^- docs: update download link" || true)
 fi
+[[ -n "$CHANGES" ]] || CHANGES="- Initial release"
 RELEASE_NOTES="### Changes
 ${CHANGES}"
 gh release create "$TAG" "$DMG" \
@@ -184,12 +192,11 @@ gh release create "$TAG" "$DMG" \
     --notes "$RELEASE_NOTES"
 ok "Release published"
 
-# ── Remove old releases ───────────────────────────────────────────────────────
-# Keep the current release and the most-recent prior release; delete the rest.
-step "Removing old releases"
-ALL_TAGS=$(gh release list --repo "$REPO" --limit 100 --json tagName,createdAt \
-    --jq 'sort_by(.createdAt) | reverse | .[].tagName')
-OLD_TAGS=$(echo "$ALL_TAGS" | tail -n +3)
+# ── Remove old releases (keep the ${KEEP_RELEASES} most recent) ───────────────
+KEEP_RELEASES=5
+step "Removing old releases (keeping ${KEEP_RELEASES} most recent)"
+OLD_TAGS=$(gh release list --repo "$REPO" --limit 100 --json tagName \
+    --jq '.[].tagName' | tail -n +$((KEEP_RELEASES + 1)) || true)
 if [[ -z "$OLD_TAGS" ]]; then
     ok "No old releases to remove"
 else
