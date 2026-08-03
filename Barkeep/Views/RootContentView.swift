@@ -3,15 +3,13 @@ import SwiftUI
 struct RootContentView: View {
     @Environment(AppState.self) var appState
     @State private var brewfileVM  = BrewfileViewModel()
-    @State private var installedVM = InstalledViewModel()
+    @State private var untrackedVM = UntrackedViewModel()
     @State private var sidebarTab  = SidebarTab.brewfile
     @State private var log         = ProcessingLog()
     @State private var isRunning   = false
     @State private var showConsole = false
     @State private var alertMessage: String? = nil
-    @State private var showMigrationScan = false
-    @State private var showCleanup = false
-    @State private var showAdopt = false
+
     @State private var consoleHeight: CGFloat = 170
     @State private var consoleDragStart: CGFloat? = nil
     @State private var brewfileWatcher = BrewfileWatcher()
@@ -24,7 +22,7 @@ struct RootContentView: View {
 
     private enum SidebarTab: String, Hashable {
         case brewfile = "Brewfile"
-        case installed = "Installed"
+        case untracked = "Untracked"
     }
 
     var body: some View {
@@ -46,24 +44,9 @@ struct RootContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .barkeepRefresh)) { _ in
             if let url = appState.brewfilePath { brewfileVM.load(from: url) }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .barkeepInstallMissing)) { _ in
-            Task { await runBundleInstall() }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .barkeepCleanupUntracked)) { _ in
-            guard !isRunning, appState.brewfilePath != nil else { return }
-            showCleanup = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .barkeepAdoptUntracked)) { _ in
-            guard appState.brewfilePath != nil else { return }
-            showAdopt = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .barkeepMigrationScan)) { _ in
-            guard appState.brewfilePath != nil else { return }
-            showMigrationScan = true
-        }
         .onChange(of: sidebarTab) { _, tab in
-            if tab == .installed {
-                Task { await installedVM.load(brewfileEntries: brewfileVM.allEntries) }
+            if tab == .untracked {
+                Task { await untrackedVM.load(brewfileEntries: brewfileVM.allEntries) }
             }
         }
         .onChange(of: brewfileVM.selectedEntryIDs) { _, _ in
@@ -74,26 +57,9 @@ struct RootContentView: View {
                 brewfileVM.isLoadingDetail = false
             }
         }
-        .onChange(of: installedVM.selectedPackageIDs) { _, _ in
-            if let pkg = installedVM.selectedPackage {
-                Task { await installedVM.loadDetail(for: pkg) }
-            }
-        }
-        .sheet(isPresented: $showMigrationScan) {
-            if let url = appState.brewfilePath {
-                MigrationScanView(brewfileVM: brewfileVM, brewfileURL: url)
-            }
-        }
-        .sheet(isPresented: $showCleanup) {
-            BundleUntrackedView(mode: .cleanup, brewfileVM: brewfileVM) { selected in
-                Task { await runCleanup(selected) }
-            }
-        }
-        .sheet(isPresented: $showAdopt) {
-            if let url = appState.brewfilePath {
-                BundleUntrackedView(mode: .adopt, brewfileVM: brewfileVM) { selected in
-                    adoptIntoBrewfile(selected, brewfileURL: url)
-                }
+        .onChange(of: untrackedVM.selectedPackageIDs) { _, _ in
+            if let pkg = untrackedVM.selectedPackage {
+                Task { await untrackedVM.loadDetail(for: pkg) }
             }
         }
         .alert("Error", isPresented: Binding(
@@ -114,8 +80,8 @@ struct RootContentView: View {
                 NavigationLink(value: SidebarTab.brewfile) {
                     Label("Brewfile", systemImage: "doc.text")
                 }
-                NavigationLink(value: SidebarTab.installed) {
-                    Label("Installed", systemImage: "shippingbox")
+                NavigationLink(value: SidebarTab.untracked) {
+                    Label("Untracked", systemImage: "questionmark.folder")
                 }
             }
             .navigationTitle("Categories")
@@ -126,7 +92,7 @@ struct RootContentView: View {
                         BrewfileListView(vm: brewfileVM, brewfileURL: url)
                     }
                 } else {
-                    InstalledListView(vm: installedVM, outdatedNames: brewfileVM.outdatedNames)
+                    UntrackedListView(vm: untrackedVM, outdatedNames: brewfileVM.outdatedNames)
                 }
             }
             .navigationTitle(sidebarTab.rawValue)
@@ -147,8 +113,8 @@ struct RootContentView: View {
                 if let brewfilePath = appState.brewfilePath {
                     ActionPanelView(
                         brewfileVM:   brewfileVM,
-                        installedVM:  installedVM,
-                        mode:         sidebarTab == .installed ? .installed : .brewfile,
+                        untrackedVM:  untrackedVM,
+                        mode:         sidebarTab == .untracked ? .installed : .brewfile,
                         log:          log,
                         isRunning:    $isRunning,
                         onError:      { alertMessage = $0 },
@@ -194,9 +160,9 @@ struct RootContentView: View {
             }
         }
 
-        if installedVM.untrackedCount > 0 {
+        if untrackedVM.untrackedCount > 0 {
             ToolbarItem(placement: .automatic) {
-                Label("\(installedVM.untrackedCount) untracked", systemImage: "questionmark.circle.fill")
+                Label("\(untrackedVM.untrackedCount) untracked", systemImage: "questionmark.circle.fill")
                     .labelStyle(.titleAndIcon)
                     .foregroundStyle(.secondary)
                     .help("Untracked packages")
@@ -238,41 +204,6 @@ struct RootContentView: View {
         }
 
         ToolbarItem(placement: .automatic) {
-            Menu {
-                Button {
-                    Task { await runBundleInstall() }
-                } label: {
-                    Label("Install Missing", systemImage: "arrow.down.app")
-                }
-                .disabled(isRunning)
-
-                Button {
-                    showAdopt = true
-                } label: {
-                    Label("Add Untracked to Brewfile…", systemImage: "plus.square.on.square")
-                }
-
-                Button {
-                    showCleanup = true
-                } label: {
-                    Label("Cleanup Untracked…", systemImage: "trash")
-                }
-                .disabled(isRunning)
-
-                Divider()
-
-                Button {
-                    showMigrationScan = true
-                } label: {
-                    Label("Scan for Migratable Apps", systemImage: "arrow.right.arrow.left.square")
-                }
-            } label: {
-                Image(systemName: "square.stack.3d.up")
-            }
-            .help("Bundle actions")
-        }
-
-        ToolbarItem(placement: .automatic) {
             Button {
                 guard let url = appState.brewfilePath else { return }
                 brewfileVM.load(from: url)
@@ -306,11 +237,11 @@ struct RootContentView: View {
 
     @ViewBuilder
     private var detailPanel: some View {
-        if sidebarTab == .installed {
-            if installedVM.selectedPackages.count > 1 {
-                MultiSelectSummary(count: installedVM.selectedPackages.count,
-                                   names: installedVM.selectedPackages.map(\.name))
-            } else if let pkg = installedVM.selectedPackage {
+        if sidebarTab == .untracked {
+            if untrackedVM.selectedPackages.count > 1 {
+                MultiSelectSummary(count: untrackedVM.selectedPackages.count,
+                                   names: untrackedVM.selectedPackages.map(\.name))
+            } else if let pkg = untrackedVM.selectedPackage {
                 PackageDetailView(package: pkg)
             } else {
                 EmptyStateView()

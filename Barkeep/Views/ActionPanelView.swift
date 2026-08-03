@@ -4,7 +4,7 @@ struct ActionPanelView: View {
     enum Mode { case brewfile, installed }
 
     @Bindable var brewfileVM: BrewfileViewModel
-    var installedVM: InstalledViewModel? = nil
+    var untrackedVM: UntrackedViewModel? = nil
     var mode: Mode
     var log: ProcessingLog
     @Binding var isRunning: Bool
@@ -47,7 +47,7 @@ struct ActionPanelView: View {
 
     @ViewBuilder
     private var installedContent: some View {
-        let selected = installedVM?.selectedPackages ?? []
+        let selected = untrackedVM?.selectedPackages ?? []
         if selected.count > 1 {
             bulkInstalledActions(selected)
         } else if let pkg = selected.first {
@@ -188,7 +188,7 @@ struct ActionPanelView: View {
                 for pkg in untracked {
                     brewfileVM.add(name: pkg.name, kind: pkg.kind,
                                    section: "Adopted", brewfileURL: brewfilePath)
-                    installedVM?.markInBrewfile(name: pkg.name, kind: pkg.kind, inBrewfile: true)
+                    untrackedVM?.markInBrewfile(name: pkg.name, kind: pkg.kind, inBrewfile: true)
                 }
             }
         }
@@ -276,7 +276,7 @@ struct ActionPanelView: View {
                 }
                 guard !section.isEmpty else { return }
                 brewfileVM.add(name: pkg.name, kind: pkg.kind, section: section, brewfileURL: brewfilePath)
-                installedVM?.markInBrewfile(name: pkg.name, kind: pkg.kind, inBrewfile: true)
+                untrackedVM?.markInBrewfile(name: pkg.name, kind: pkg.kind, inBrewfile: true)
             }
         }
         .onChange(of: pkg.id) { _, _ in

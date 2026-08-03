@@ -2,7 +2,7 @@ import SwiftUI
 
 @Observable
 @MainActor
-final class InstalledViewModel {
+final class UntrackedViewModel {
     var formulae: [BrewPackage] = []
     var casks: [BrewPackage] = []
     var isLoading = false
@@ -23,7 +23,7 @@ final class InstalledViewModel {
     }
 
     var untrackedCount: Int {
-        (formulae + casks).filter { !$0.isInBrewfile }.count
+        formulae.count + casks.count
     }
 
     var selectedPackages: [BrewPackage] {
@@ -40,17 +40,17 @@ final class InstalledViewModel {
 
     func load(brewfileEntries: [BrewfileEntry]) async {
         await withLoadingState {
-            async let formulaeNames = BrewRunner.shared.listFormulae()
+            async let formulaeNames = BrewRunner.shared.listRequestedFormulae()
             async let caskNames     = BrewRunner.shared.listCasks()
 
             let (fNames, cNames) = try await (formulaeNames, caskNames)
             let tracked = Set(brewfileEntries.map { $0.name })
 
-            self.formulae = fNames.map {
-                BrewPackage(name: $0, kind: .formula, isInstalled: true, isInBrewfile: tracked.contains($0))
+            self.formulae = fNames.filter { !tracked.contains($0) }.map {
+                BrewPackage(name: $0, kind: .formula, isInstalled: true, isInBrewfile: false)
             }
-            self.casks = cNames.map {
-                BrewPackage(name: $0, kind: .cask, isInstalled: true, isInBrewfile: tracked.contains($0))
+            self.casks = cNames.filter { !tracked.contains($0) }.map {
+                BrewPackage(name: $0, kind: .cask, isInstalled: true, isInBrewfile: false)
             }
         }
     }

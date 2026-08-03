@@ -41,26 +41,7 @@ struct BarkeepApp: App {
                 .keyboardShortcut("R", modifiers: .command)
             }
 
-            CommandMenu("Bundle") {
-                Button("Install Missing") {
-                    NotificationCenter.default.post(name: .barkeepInstallMissing, object: nil)
-                }
-                .keyboardShortcut("I", modifiers: .command)
 
-                Button("Add Untracked to Brewfile…") {
-                    NotificationCenter.default.post(name: .barkeepAdoptUntracked, object: nil)
-                }
-
-                Button("Cleanup Untracked…") {
-                    NotificationCenter.default.post(name: .barkeepCleanupUntracked, object: nil)
-                }
-
-                Divider()
-
-                Button("Scan for Migratable Apps…") {
-                    NotificationCenter.default.post(name: .barkeepMigrationScan, object: nil)
-                }
-            }
         }
 
         Window("Help", id: "help") {
@@ -72,8 +53,5 @@ struct BarkeepApp: App {
 
 extension Notification.Name {
     static let barkeepRefresh          = Notification.Name("barkeepRefresh")
-    static let barkeepInstallMissing   = Notification.Name("barkeepInstallMissing")
-    static let barkeepAdoptUntracked   = Notification.Name("barkeepAdoptUntracked")
-    static let barkeepCleanupUntracked = Notification.Name("barkeepCleanupUntracked")
-    static let barkeepMigrationScan    = Notification.Name("barkeepMigrationScan")
+
 }

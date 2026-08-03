@@ -1,7 +1,7 @@
 import SwiftUI
 
-struct InstalledListView: View {
-    @Bindable var vm: InstalledViewModel
+struct UntrackedListView: View {
+    @Bindable var vm: UntrackedViewModel
     var outdatedNames: Set<String> = []
 
     var body: some View {
@@ -18,7 +18,7 @@ struct InstalledListView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if vm.filteredFormulae.isEmpty && vm.filteredCasks.isEmpty {
-                emptyLabel(vm.filterText.isEmpty ? "No packages found" : "No matches")
+                emptyLabel(vm.filterText.isEmpty ? "No untracked packages" : "No matches")
             } else {
                 List(selection: $vm.selectedPackageIDs) {
                     if !vm.filteredFormulae.isEmpty {
@@ -26,7 +26,7 @@ struct InstalledListView: View {
                             ForEach(vm.filteredFormulae) { pkg in
                                 PackageRowView(name: pkg.name, kind: pkg.kind,
                                                hasUpdate: outdatedNames.contains(pkg.name),
-                                               untracked: !pkg.isInBrewfile)
+                                               untracked: true)
                                     .tag(pkg.id)
                             }
                         }
@@ -36,7 +36,7 @@ struct InstalledListView: View {
                             ForEach(vm.filteredCasks) { pkg in
                                 PackageRowView(name: pkg.name, kind: pkg.kind,
                                                hasUpdate: outdatedNames.contains(pkg.name),
-                                               untracked: !pkg.isInBrewfile)
+                                               untracked: true)
                                     .tag(pkg.id)
                             }
                         }
