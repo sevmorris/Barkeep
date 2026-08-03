@@ -46,11 +46,19 @@ final class UntrackedViewModel {
             let (fNames, cNames) = try await (formulaeNames, caskNames)
             let tracked = Set(brewfileEntries.map { $0.name })
 
-            self.formulae = fNames.filter { !tracked.contains($0) }.map {
-                BrewPackage(name: $0, kind: .formula, isInstalled: true, isInBrewfile: false)
+            let untrackedFormulaeNames = Array(fNames.filter { !tracked.contains($0) })
+            let untrackedCaskNames = Array(cNames.filter { !tracked.contains($0) })
+            
+            async let formulaeInfo = BrewRunner.shared.info(names: untrackedFormulaeNames, kind: .formula)
+            async let caskInfo = BrewRunner.shared.info(names: untrackedCaskNames, kind: .cask)
+            
+            let (fInfo, cInfo) = try await (formulaeInfo, caskInfo)
+
+            self.formulae = fInfo.map { pkg in
+                var p = pkg; p.isInBrewfile = false; return p
             }
-            self.casks = cNames.filter { !tracked.contains($0) }.map {
-                BrewPackage(name: $0, kind: .cask, isInstalled: true, isInBrewfile: false)
+            self.casks = cInfo.map { pkg in
+                var p = pkg; p.isInBrewfile = false; return p
             }
         }
     }

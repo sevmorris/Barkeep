@@ -25,6 +25,7 @@ struct UntrackedListView: View {
                         Section("Formulae (\(vm.filteredFormulae.count))") {
                             ForEach(vm.filteredFormulae) { pkg in
                                 PackageRowView(name: pkg.name, kind: pkg.kind,
+                                               description: pkg.description,
                                                hasUpdate: outdatedNames.contains(pkg.name),
                                                untracked: true)
                                     .tag(pkg.id)
@@ -35,6 +36,7 @@ struct UntrackedListView: View {
                         Section("Casks (\(vm.filteredCasks.count))") {
                             ForEach(vm.filteredCasks) { pkg in
                                 PackageRowView(name: pkg.name, kind: pkg.kind,
+                                               description: pkg.description,
                                                hasUpdate: outdatedNames.contains(pkg.name),
                                                untracked: true)
                                     .tag(pkg.id)

@@ -4,6 +4,7 @@ import SwiftUI
 struct PackageRowView: View {
     let name: String
     let kind: PackageKind
+    var description: String? = nil
     var hasUpdate: Bool = false
     var untracked: Bool = false
 
@@ -14,10 +15,20 @@ struct PackageRowView: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 14)
 
-            Text(name)
-                .font(.body)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name)
+                    .font(.body)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                
+                if let description = description, !description.isEmpty {
+                    Text(description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+            }
 
             Spacer(minLength: 4)
 
