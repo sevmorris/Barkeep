@@ -19,7 +19,13 @@ struct RootContentView: View {
     private static let consoleMinHeight: CGFloat = 80
     private static let consoleMaxHeight: CGFloat = 600
 
-    private enum SidebarTab { case brewfile, installed }
+    @State private var showInspector = true
+    @State private var columnVisibility = NavigationSplitViewVisibility.all
+
+    private enum SidebarTab: String, Hashable {
+        case brewfile = "Brewfile"
+        case installed = "Installed"
+    }
 
     var body: some View {
         @Bindable var appState = appState
@@ -103,47 +109,41 @@ struct RootContentView: View {
     // MARK: - Main layout
 
     private var mainWindow: some View {
-        VStack(spacing: 0) {
-            toolbar
-            Divider()
-
-            HStack(spacing: 0) {
-                VStack(spacing: 0) {
-                    Picker("", selection: $sidebarTab) {
-                        Text("Brewfile").tag(SidebarTab.brewfile)
-                        Text("Installed").tag(SidebarTab.installed)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .padding(8)
-
-                    Divider()
-
-                    if sidebarTab == .brewfile {
-                        if let url = appState.brewfilePath {
-                            BrewfileListView(vm: brewfileVM, brewfileURL: url)
-                        }
-                    } else {
-                        InstalledListView(vm: installedVM, outdatedNames: brewfileVM.outdatedNames)
-                    }
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            List(selection: $sidebarTab) {
+                NavigationLink(value: SidebarTab.brewfile) {
+                    Label("Brewfile", systemImage: "doc.text")
                 }
-                .frame(width: 240)
-
-                Divider()
-
-                VStack(spacing: 0) {
-                    detailPanel
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                    if showConsole {
-                        consoleResizeHandle
-                        ConsoleView(log: log)
-                            .frame(height: consoleHeight)
-                    }
+                NavigationLink(value: SidebarTab.installed) {
+                    Label("Installed", systemImage: "shippingbox")
                 }
+            }
+            .navigationTitle("Categories")
+        } content: {
+            Group {
+                if sidebarTab == .brewfile {
+                    if let url = appState.brewfilePath {
+                        BrewfileListView(vm: brewfileVM, brewfileURL: url)
+                    }
+                } else {
+                    InstalledListView(vm: installedVM, outdatedNames: brewfileVM.outdatedNames)
+                }
+            }
+            .navigationTitle(sidebarTab.rawValue)
+        } detail: {
+            VStack(spacing: 0) {
+                detailPanel
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                Divider()
-
+                if showConsole {
+                    consoleResizeHandle
+                    ConsoleView(log: log)
+                        .frame(height: consoleHeight)
+                }
+            }
+            .navigationTitle(appState.brewfilePath?.lastPathComponent ?? "Barkeep")
+            .navigationSubtitle(appState.brewfilePath?.deletingLastPathComponent().path.replacingOccurrences(of: NSHomeDirectory(), with: "~") ?? "")
+            .inspector(isPresented: $showInspector) {
                 if let brewfilePath = appState.brewfilePath {
                     ActionPanelView(
                         brewfileVM:   brewfileVM,
@@ -154,8 +154,11 @@ struct RootContentView: View {
                         onError:      { alertMessage = $0 },
                         brewfilePath: brewfilePath
                     )
-                    .frame(width: 220)
+                    .inspectorColumnWidth(min: 220, ideal: 240, max: 300)
                 }
+            }
+            .toolbar {
+                toolbarContent
             }
         }
         .frame(minWidth: 860, minHeight: 520)
@@ -163,64 +166,67 @@ struct RootContentView: View {
 
     // MARK: - Toolbar
 
-    private var toolbar: some View {
-        HStack(spacing: 12) {
-            // Brewfile path
-            if let url = appState.brewfilePath {
-                Text(url.lastPathComponent)
-                    .font(.subheadline.bold())
-                Text(url.deletingLastPathComponent().path
-                         .replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                    .font(.footnote)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            if brewfileVM.isLoading {
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        if brewfileVM.isLoading {
+            ToolbarItem(placement: .automatic) {
                 ProgressView().controlSize(.small)
             }
+        }
 
-            if !brewfileVM.outdatedNames.isEmpty {
+        if !brewfileVM.outdatedNames.isEmpty {
+            ToolbarItem(placement: .automatic) {
                 Label("\(brewfileVM.outdatedNames.count) updates", systemImage: "arrow.up.circle.fill")
-                    .font(.footnote)
+                    .labelStyle(.titleAndIcon)
                     .foregroundStyle(.orange)
+                    .help("Updates available")
             }
+        }
 
-            if installedVM.untrackedCount > 0 {
+        if installedVM.untrackedCount > 0 {
+            ToolbarItem(placement: .automatic) {
                 Label("\(installedVM.untrackedCount) untracked", systemImage: "questionmark.circle.fill")
-                    .font(.footnote)
+                    .labelStyle(.titleAndIcon)
                     .foregroundStyle(.secondary)
+                    .help("Untracked packages")
             }
+        }
 
-            if let update = appState.availableUpdate {
+        if let update = appState.availableUpdate {
+            ToolbarItem(placement: .automatic) {
                 Button {
                     Task { await checkForUpdates(silent: false, appState: appState) }
                 } label: {
-                    Label("Barkeep \(update.version) available", systemImage: "arrow.down.circle.fill")
-                        .font(.footnote)
+                    Label("Barkeep \(update.version)", systemImage: "arrow.down.circle.fill")
                         .foregroundStyle(.blue)
                 }
-                .buttonStyle(.plain)
                 .help("Update available — click to download or view release notes")
             }
+        }
 
+        ToolbarItem(placement: .automatic) {
             if isRunning {
                 Button {
                     Task { await BrewRunner.shared.cancel() }
                 } label: {
                     Image(systemName: "stop.circle").foregroundStyle(.red)
                 }
-                .buttonStyle(.plain)
                 .help("Cancel")
+            } else {
+                EmptyView()
             }
+        }
 
-            toolbarButton(icon: showConsole ? "terminal.fill" : "terminal",
-                          active: showConsole, help: "Toggle console") {
+        ToolbarItem(placement: .automatic) {
+            Button {
                 withAnimation(.easeInOut(duration: 0.2)) { showConsole.toggle() }
+            } label: {
+                Image(systemName: showConsole ? "terminal.fill" : "terminal")
             }
+            .help("Toggle console")
+        }
 
+        ToolbarItem(placement: .automatic) {
             Menu {
                 Button {
                     Task { await runBundleInstall() }
@@ -251,25 +257,38 @@ struct RootContentView: View {
                 }
             } label: {
                 Image(systemName: "square.stack.3d.up")
-                    .foregroundStyle(.secondary)
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
             .help("Bundle actions")
+        }
 
-            toolbarButton(icon: "arrow.clockwise", help: "Refresh") {
+        ToolbarItem(placement: .automatic) {
+            Button {
                 guard let url = appState.brewfilePath else { return }
                 brewfileVM.load(from: url)
+            } label: {
+                Image(systemName: "arrow.clockwise")
             }
             .disabled(isRunning)
-
-            toolbarButton(icon: "folder", help: "Change Brewfile") {
-                appState.showBrewfilePicker = true
-            }
+            .help("Refresh")
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+
+        ToolbarItem(placement: .automatic) {
+            Button {
+                appState.showBrewfilePicker = true
+            } label: {
+                Image(systemName: "folder")
+            }
+            .help("Change Brewfile")
+        }
+        
+        ToolbarItem(placement: .automatic) {
+            Button {
+                showInspector.toggle()
+            } label: {
+                Image(systemName: "sidebar.trailing")
+            }
+            .help("Toggle Inspector")
+        }
     }
 
     // MARK: - Detail panel
@@ -345,23 +364,6 @@ struct RootContentView: View {
                 )
         }
         .frame(height: 6)
-    }
-
-    // MARK: - Helpers
-
-    @ViewBuilder
-    private func toolbarButton(
-        icon: String,
-        active: Bool = false,
-        help: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .foregroundStyle(active ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
-        }
-        .buttonStyle(.plain)
-        .help(help)
     }
 
     // MARK: - Bundle commands

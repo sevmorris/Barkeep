@@ -14,6 +14,7 @@ struct BarkeepApp: App {
                     await checkForUpdates(silent: true, appState: appState)
                 }
         }
+        .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing: .help) {
                 Button("Barkeep Help") {
