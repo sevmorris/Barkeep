@@ -176,10 +176,21 @@ struct RootContentView: View {
 
         if !brewfileVM.outdatedNames.isEmpty {
             ToolbarItem(placement: .automatic) {
-                Label("\(brewfileVM.outdatedNames.count) updates", systemImage: "arrow.up.circle.fill")
-                    .labelStyle(.titleAndIcon)
-                    .foregroundStyle(.orange)
-                    .help("Updates available")
+                Button {
+                    showConsole = true
+                    Task {
+                        let names = Array(brewfileVM.outdatedNames)
+                        await runStreaming(["upgrade"] + names, successMessage: "All updates complete.")
+                        await BrewRunner.shared.invalidateCache(names: names)
+                        await brewfileVM.refreshOutdated()
+                    }
+                } label: {
+                    Label("\(brewfileVM.outdatedNames.count) updates", systemImage: "arrow.up.circle.fill")
+                        .labelStyle(.titleAndIcon)
+                        .foregroundStyle(.orange)
+                }
+                .disabled(isRunning)
+                .help("Upgrade all outdated packages")
             }
         }
 
