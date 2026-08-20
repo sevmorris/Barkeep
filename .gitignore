@@ -1,7 +1,6 @@
 # Xcode
 build/
 *.xcuserstate
-*.xcworkspace/
 xcuserdata/
 DerivedData/
 *.moved-aside
