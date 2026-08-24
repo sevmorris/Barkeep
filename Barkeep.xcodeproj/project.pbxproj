@@ -23,7 +23,6 @@
 		7C2B7BEC58E60A5D41476D56 /* PackageRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EB814FB64C5EFEA1F4BED85 /* PackageRowView.swift */; };
 		7D23AF79A528A13F538861EC /* UntrackedViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 785D7B9CE182339A802885A4 /* UntrackedViewModel.swift */; };
 		7F747DD3D6F937D13DF5A9C6 /* BarkeepTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA483CBD6AB1F29CFF880E2F /* BarkeepTests.swift */; };
-		8A735375C6DA32A33FFE4775 /* MigratableApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CEB947E5B260E4DA426017E /* MigratableApp.swift */; };
 		911F6E689C64678B8E360648 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1515D8935F4133FF1B61B619 /* NotificationService.swift */; };
 		B3744A81C87FEC15964DDD3B /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 355D2976517975C5C3DFB5F4 /* EmptyStateView.swift */; };
 		B8A43841BD388FFBAA5BB6E4 /* BrewfileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D03CAAC2AD8ABC48B6735C0 /* BrewfileWatcher.swift */; };
@@ -55,7 +54,6 @@
 		323079A45F04FAB3BF147CEA /* BarkeepApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarkeepApp.swift; sourceTree = "<group>"; };
 		355D2976517975C5C3DFB5F4 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		4A5401537BB31A8BE2B168D9 /* ActionPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionPanelView.swift; sourceTree = "<group>"; };
-		4CEB947E5B260E4DA426017E /* MigratableApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MigratableApp.swift; sourceTree = "<group>"; };
 		4EB814FB64C5EFEA1F4BED85 /* PackageRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackageRowView.swift; sourceTree = "<group>"; };
 		52E00817C58F1894743F7457 /* BrewPackage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrewPackage.swift; sourceTree = "<group>"; };
 		550861B24DBABFAA5C5AE258 /* BarkeepTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BarkeepTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -134,7 +132,6 @@
 				076800E1FB5750216D1A8DAF /* AppState.swift */,
 				BB6481A2E615EF61078E7A9D /* BrewfileEntry.swift */,
 				52E00817C58F1894743F7457 /* BrewPackage.swift */,
-				4CEB947E5B260E4DA426017E /* MigratableApp.swift */,
 				931256894C98A3CBEA8C9F0F /* ProcessingLog.swift */,
 			);
 			path = Models;
@@ -277,7 +274,6 @@
 				C4656E342AE6533608EC7CA1 /* HelpView.swift in Sources */,
 				0E79052390CF17AD9F49C098 /* UntrackedListView.swift in Sources */,
 				7D23AF79A528A13F538861EC /* UntrackedViewModel.swift in Sources */,
-				8A735375C6DA32A33FFE4775 /* MigratableApp.swift in Sources */,
 				6EE44E0E750DE8510020C858 /* MultiSelectSummary.swift in Sources */,
 				911F6E689C64678B8E360648 /* NotificationService.swift in Sources */,
 				CAB052BE87B0ED51C5ABAD30 /* PackageDetailView.swift in Sources */,

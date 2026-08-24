@@ -308,68 +308,6 @@ struct RootContentView: View {
         .frame(height: 6)
     }
 
-    // MARK: - Bundle commands
-
-    /// Run `brew bundle install --file=<path>`. Idempotent — installs whatever's
-    /// missing and skips what's already present.
-    private func runBundleInstall() async {
-        guard !isRunning, let url = appState.brewfilePath else { return }
-        showConsole = true
-        await runStreaming(
-            ["bundle", "install", "--file=\(url.path)"],
-            successMessage: "Brewfile install complete."
-        )
-        // We don't know which packages got installed — drop everything.
-        await BrewRunner.shared.invalidateAllCache()
-        if let url = appState.brewfilePath { brewfileVM.load(from: url) }
-    }
-
-    /// Add the selected untracked packages to the Brewfile under "Adopted".
-    private func adoptIntoBrewfile(
-        _ selected: [(name: String, kind: PackageKind)],
-        brewfileURL: URL
-    ) {
-        for (name, kind) in selected {
-            brewfileVM.add(name: name, kind: kind, section: "Adopted", brewfileURL: brewfileURL)
-        }
-    }
-
-    /// Uninstall the selected untracked packages one by one, streaming output.
-    private func runCleanup(_ selected: [(name: String, kind: PackageKind)]) async {
-        guard !isRunning, !selected.isEmpty else { return }
-        showConsole = true
-        isRunning = true
-        log.clear()
-
-        var failures: [String] = []
-        for (name, kind) in selected {
-            var args = ["uninstall"]
-            if kind == .cask { args.append("--cask") }
-            args.append(name)
-            log.append("$ brew " + args.joined(separator: " "))
-            do {
-                try await BrewRunner.shared.run(args) { @MainActor line, level in
-                    log.append(line, level: level)
-                }
-                await BrewRunner.shared.invalidateCache(names: [name])
-            } catch {
-                log.append("Error: \(error.localizedDescription)", level: .error)
-                failures.append(name)
-            }
-        }
-
-        let removed = selected.count - failures.count
-        log.append("Done. Removed \(removed) of \(selected.count) packages.")
-        await brewfileVM.refreshOutdated()
-        await NotificationService.showCompletionNotification(
-            operation: "Cleanup complete — removed \(removed) of \(selected.count)."
-        )
-        if !failures.isEmpty {
-            alertMessage = "Failed to uninstall: \(failures.joined(separator: ", "))"
-        }
-        isRunning = false
-    }
-
     /// Shared streaming runner used for toolbar-level brew commands.
     private func runStreaming(_ args: [String], successMessage: String) async {
         isRunning = true

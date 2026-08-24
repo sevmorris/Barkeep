@@ -25,4 +25,4 @@ DerivedData/
 *.profraw
 
 # Claude
-.claude/
+.claude/settings.local.json

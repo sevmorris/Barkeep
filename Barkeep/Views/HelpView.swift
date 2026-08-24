@@ -49,18 +49,8 @@ struct HelpView: View {
                     definition("N updates",       as: "Number of installed packages with available updates")
                     definition("⏹  Stop",         as: "Cancel a running brew command (visible while running)")
                     definition("Terminal icon",    as: "Toggle the output console")
-                    definition("Bundle menu",      as: "Install missing, cleanup untracked, or scan for migratable apps")
                     definition("⟳  Refresh",      as: "Reload the Brewfile and re-check for updates")
                     definition("📁  Folder",       as: "Change the active Brewfile")
-                }
-
-                section("Bundle Actions") {
-                    text("Sync your system with the active Brewfile.")
-                    definition("Install Missing",      as: "Runs `brew bundle install` — installs anything in the Brewfile that isn't already on the system (⌘I)")
-                    definition("Add Untracked…",       as: "Lists user-installed packages not in the Brewfile so you can adopt them under an \"Adopted\" section")
-                    definition("Cleanup Untracked…",   as: "Same list as Add Untracked, but the action is uninstall — useful for pruning packages you don't want anymore")
-                    definition("Scan for Migratable…", as: "Finds apps already in /Applications that have a matching Homebrew cask")
-                    text("Add Untracked and Cleanup both filter to formulae you explicitly installed (skipping transitive dependencies) plus all casks.")
                 }
 
                 section("Keyboard Shortcuts") {
