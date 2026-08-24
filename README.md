@@ -19,3 +19,7 @@ Barkeep is a companion to [mrk](https://github.com/sevmorris/mrk), a macOS boots
 
 - macOS 14.0+
 - [Homebrew](https://brew.sh) installed
+
+## License
+Copyright © 2026 Seven Morris.
+Distributed under the [GNU General Public License v3.0](LICENSE).
