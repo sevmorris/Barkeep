@@ -198,15 +198,20 @@ ok "Release published"
 # ── Remove old releases (keep the ${KEEP_RELEASES} most recent) ───────────────
 KEEP_RELEASES=5
 step "Removing old releases (keeping ${KEEP_RELEASES} most recent)"
+# Filtered to v* so non-release tags (build-dependency releases, checkpoints)
+# are never in scope for pruning by date alone.
 OLD_TAGS=$(gh release list --repo "$REPO" --limit 100 --json tagName \
-    --jq '.[].tagName' | tail -n +$((KEEP_RELEASES + 1)) || true)
+    --jq '.[].tagName' | grep -E '^v[0-9]' | tail -n +$((KEEP_RELEASES + 1)) || true)
 if [[ -z "$OLD_TAGS" ]]; then
     ok "No old releases to remove"
 else
     while IFS= read -r old_tag; do
-        gh release delete "$old_tag" --repo "$REPO" --yes --cleanup-tag 2>/dev/null || true
-        git tag -d "$old_tag" 2>/dev/null || true
-        ok "Removed $old_tag"
+        # Prunes the release page and its asset, NOT the git tag. The tag is the
+        # only durable pointer to what shipped: without it a version is
+        # unbuildable from a clean clone and unreachable from its own history.
+        # A release page is a convenience; a tag is the record.
+        gh release delete "$old_tag" --repo "$REPO" --yes 2>/dev/null || true
+        ok "Pruned release page for $old_tag (tag kept)"
     done <<< "$OLD_TAGS"
 fi
 
