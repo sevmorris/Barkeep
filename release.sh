@@ -48,6 +48,7 @@ DERIVED_DATA="/tmp/barkeep_build_${VERSION}"
 APP_PATH="$DERIVED_DATA/Build/Products/Release/Barkeep.app"
 STAGING="/tmp/barkeep_dmg_${VERSION}"
 DMG="/tmp/Barkeep-${TAG}.dmg"
+APP_ZIP="/tmp/Barkeep-${TAG}-app.zip"
 MOUNT="/tmp/barkeep_verify_${VERSION}"
 NOTES_FILE="$PROJECT_DIR/release-notes/${TAG}.md"
 
@@ -67,6 +68,7 @@ cleanup() {
     fi
     rm -rf -- "${STAGING:-}" "${MOUNT:-}" "${DERIVED_DATA:-}" 2>/dev/null || true
     rm -f  -- "${DMG:-}" 2>/dev/null || true
+    rm -f  -- "${APP_ZIP:-}" 2>/dev/null || true
 }
 # This function was defined and never registered, so none of it ever ran: every
 # failed release left its staging directory, mount point, DerivedData and DMG
@@ -232,6 +234,25 @@ BUILT_VERSION=$(defaults read "$APP_PATH/Contents/Info.plist" CFBundleShortVersi
     fail "App version mismatch: expected $VERSION, got $BUILT_VERSION"
 ok "App reports $BUILT_VERSION"
 
+# ── Notarize app ──────────────────────────────────────────────────────────────
+step "Notarizing app"
+# Stapling the DMG alone leaves the app unstapled once it is dragged out, which
+# is the only form anyone actually runs. Gatekeeper still passes it — it falls
+# back to asking Apple — but that needs a working network on first launch. So
+# the app gets its own notarization round trip and its own ticket here, before
+# the DMG is built around it; the DMG is then stapled separately below.
+#
+# The ticket covers this exact cdhash, so this has to run after codesigning and
+# before the app is copied into the DMG.
+rm -f "$APP_ZIP"
+ditto -c -k --keepParent "$APP_PATH" "$APP_ZIP"
+xcrun notarytool submit "$APP_ZIP" --wait --keychain-profile "$NOTARY_PROFILE" \
+    || fail "App notarization failed"
+xcrun stapler staple "$APP_PATH" || fail "Stapling the app failed"
+xcrun stapler validate "$APP_PATH" >/dev/null || fail "App has no valid stapled ticket"
+rm -f "$APP_ZIP"
+ok "App notarized and stapled"
+
 # ── Stage DMG contents ────────────────────────────────────────────────────────
 step "Staging DMG contents"
 rm -rf "$STAGING"
@@ -274,7 +295,17 @@ rm -rf "$MOUNT"
 mkdir "$MOUNT"
 hdiutil attach "$DMG" -mountpoint "$MOUNT" -quiet -nobrowse
 DMG_VERSION=$(defaults read "$MOUNT/Barkeep.app/Contents/Info.plist" CFBundleShortVersionString)
+# Check the ticket on the copy that actually ships, not on the build product
+# we stapled — those are the two that can drift apart. Captured before the
+# detach so the volume is never left mounted on a failure.
+if xcrun stapler validate "$MOUNT/Barkeep.app" >/dev/null 2>&1; then
+    DMG_APP_STAPLED=1
+else
+    DMG_APP_STAPLED=0
+fi
 hdiutil detach "$MOUNT" -quiet
+[[ "$DMG_APP_STAPLED" == 1 ]] || \
+    fail "App inside the DMG carries no notarization ticket"
 [[ "$DMG_VERSION" == "$VERSION" ]] || \
     fail "DMG version mismatch: expected $VERSION, got $DMG_VERSION"
 ok "DMG contains $DMG_VERSION"
