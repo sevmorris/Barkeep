@@ -13,7 +13,7 @@ final class AppState {
 
     var brewfilePath: URL? {
         didSet {
-            let ud = UserDefaults.standard
+            let ud = defaults
             if let url = brewfilePath {
                 // App isn't sandboxed — plain bookmarks are enough to
                 // remember the path across launches.
@@ -32,8 +32,12 @@ final class AppState {
     /// Set to true if a saved bookmark was stale or unresolvable at launch.
     private(set) var brewfileBookmarkWasReset = false
 
-    init() {
-        let ud = UserDefaults.standard
+    /// Where the Brewfile's location is read from and saved to.
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .app) {
+        self.defaults = defaults
+        let ud = defaults
 
         if let bookmark = ud.data(forKey: Keys.brewfileBookmark) {
             var isStale = false

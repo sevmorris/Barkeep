@@ -286,3 +286,82 @@ struct ProcessingLogTests {
         #expect(log.entries.count == 900)
     }
 }
+
+// MARK: - AppState defaults
+
+/// Runs `body` with a defaults suite of its own and a folder to put files in,
+/// both removed afterwards.
+///
+/// The tests run inside the app, so `UserDefaults.standard` here is the
+/// developer's real settings. The suite is named by a path inside the folder.
+/// A suite named like a bundle identifier lives in ~/Library/Preferences, and
+/// removing its domain empties the file but leaves it there, matching the
+/// io.github.sevmorris.* pattern the App Preferences source backs up; deleting
+/// the file does not hold, because cfprefsd writes it back after the test has
+/// finished. Deleting a folder of our own does.
+private func withScratchDefaults(_ body: (UserDefaults, URL) throws -> Void) throws {
+    let folder = FileManager.default.temporaryDirectory
+        .appendingPathComponent("barkeep-defaults-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let suiteName = folder.appendingPathComponent("defaults").path
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer {
+        defaults.removePersistentDomain(forName: suiteName)
+        try? FileManager.default.removeItem(at: folder)
+    }
+    try body(defaults, folder)
+}
+
+@Suite("AppState defaults")
+@MainActor
+struct AppStateDefaultsTests {
+
+    @Test("A test run does not get the real defaults")
+    func testRunGetsScratchDefaults() {
+        #expect(AppLauncher.isHostingTests)
+        #expect(UserDefaults.app !== UserDefaults.standard)
+    }
+
+    @Test("A chosen Brewfile comes back from the same store")
+    func brewfileRoundTrips() throws {
+        try withScratchDefaults { defaults, folder in
+            let brewfile = folder.appendingPathComponent("Brewfile")
+            try "brew \"git\"\n".write(to: brewfile, atomically: true, encoding: .utf8)
+
+            AppState(defaults: defaults).brewfilePath = brewfile
+            #expect(defaults.data(forKey: "bk_brewfileBookmark") != nil)
+
+            let restored = AppState(defaults: defaults).brewfilePath
+            #expect(restored?.resolvingSymlinksInPath() == brewfile.resolvingSymlinksInPath())
+        }
+    }
+
+    @Test("A plain path from an older build becomes a bookmark in the same store")
+    func legacyPathMigrates() throws {
+        try withScratchDefaults { defaults, folder in
+            let brewfile = folder.appendingPathComponent("Brewfile")
+            try "brew \"git\"\n".write(to: brewfile, atomically: true, encoding: .utf8)
+            defaults.set(brewfile.path, forKey: "BrewfilePath")
+
+            let state = AppState(defaults: defaults)
+            #expect(state.brewfilePath?.resolvingSymlinksInPath() == brewfile.resolvingSymlinksInPath())
+            #expect(defaults.string(forKey: "BrewfilePath") == nil)
+            #expect(defaults.data(forKey: "bk_brewfileBookmark") != nil)
+        }
+    }
+
+    /// The path that, at every test launch, could drop the developer's own
+    /// saved Brewfile: a bookmark that no longer resolves is removed.
+    @Test("An unresolvable bookmark is dropped from the store it was read from")
+    func unresolvableBookmarkIsDropped() throws {
+        try withScratchDefaults { defaults, _ in
+            let garbage = Data("not a bookmark".utf8)
+            defaults.set(garbage, forKey: "bk_brewfileBookmark")
+
+            let state = AppState(defaults: defaults)
+            #expect(state.brewfileBookmarkWasReset)
+            // Nil, or a fresh bookmark for ~/mrk/Brewfile where one exists.
+            #expect(defaults.data(forKey: "bk_brewfileBookmark") != garbage)
+        }
+    }
+}
