@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    # WaxOnWaxOff's build-and-test job, less the FFmpeg fetch: Barkeep bundles
+    # no binaries. The repo is public, so the macOS runner is free.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          # The project is objectVersion 77 (Xcode 16+) and its tests use Swift
+          # Testing; 26.3 is what the sibling apps pin.
+          xcode-version: '26.3'
+
+      - name: Build and test
+        # No scheme is shared in the repo. On a fresh checkout xcodebuild
+        # creates one per target, and the Barkeep scheme's test action runs
+        # BarkeepTests. The cap is ClipHack's: a wedged test host fails in
+        # minutes instead of burning the job budget.
+        timeout-minutes: 15
+        run: |
+          xcodebuild \
+            -project Barkeep.xcodeproj \
+            -scheme Barkeep \
+            -configuration Debug \
+            -destination 'platform=macOS,arch=arm64' \
+            test
