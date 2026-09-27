@@ -4,7 +4,7 @@
 # Usage: ./release.sh <version> [--generated-notes]
 #   e.g. ./release.sh 1.0
 #
-# Requires: xcodebuild, hdiutil, gh (GitHub CLI), git
+# Requires: xcodebuild, hdiutil, gh (GitHub CLI), git, and a python3 with dmgbuild
 
 set -euo pipefail
 
@@ -46,7 +46,6 @@ PROJECT="$PROJECT_DIR/Barkeep.xcodeproj"
 SCHEME="Barkeep"
 DERIVED_DATA="/tmp/barkeep_build_${VERSION}"
 APP_PATH="$DERIVED_DATA/Build/Products/Release/Barkeep.app"
-STAGING="/tmp/barkeep_dmg_${VERSION}"
 DMG="/tmp/Barkeep-${TAG}.dmg"
 APP_ZIP="/tmp/Barkeep-${TAG}-app.zip"
 MOUNT="/tmp/barkeep_verify_${VERSION}"
@@ -66,7 +65,7 @@ cleanup() {
     if [[ -d "${MOUNT:-}" ]]; then
         hdiutil detach "$MOUNT" -quiet 2>/dev/null || true
     fi
-    rm -rf -- "${STAGING:-}" "${MOUNT:-}" "${DERIVED_DATA:-}" 2>/dev/null || true
+    rm -rf -- "${MOUNT:-}" "${DERIVED_DATA:-}" 2>/dev/null || true
     rm -f  -- "${DMG:-}" 2>/dev/null || true
     rm -f  -- "${APP_ZIP:-}" 2>/dev/null || true
 }
@@ -80,7 +79,16 @@ trap cleanup EXIT
 
 # ── Preflight ─────────────────────────────────────────────────────────────────
 step "Preflight checks"
-for cmd in xcodebuild hdiutil gh git; do
+python3 -c "import dmgbuild" 2>/dev/null \
+    || fail "python3 module 'dmgbuild' not installed — run: python3 -m pip install dmgbuild"
+
+# Importing dmgbuild does not prove it can run. On 2026-09-16 a pyenv Python
+# built against Xcode 27's macOS 27 SDK, on macOS 26.7, imported it and then
+# segfaulted on its first subprocess — dmgbuild's hdiutil call.
+python3 -c "import subprocess; subprocess.run(['/usr/bin/true'], check=True)" &>/dev/null \
+    || fail "$(command -v python3) cannot start a subprocess, so dmgbuild would crash — rebuild that Python against an SDK no newer than this macOS"
+
+for cmd in xcodebuild hdiutil gh git python3; do
     command -v $cmd &>/dev/null || fail "'$cmd' not found in PATH"
 done
 ok "Tools present"
@@ -183,6 +191,15 @@ if [[ -n "$HIGHEST_TAG" ]]; then
 fi
 ok "Version $VERSION does not go backwards"
 
+# Absent siblings are not drift — a fresh clone or a CI checkout has none, and
+# the check passes quietly. Only a content mismatch stops the release.
+#
+# Worded to avoid quoting the registration marker itself: check-shared.sh finds
+# shared files by grepping for that phrase, so spelling it here would enrol this
+# script — which is app-specific and must never be compared across repos.
+step "Checking shared files against sibling repos"
+"$PROJECT_DIR/scripts/check-shared.sh" \
+    || fail "Shared files have drifted from the sibling repos"
 
 # ── Release-notes gate ────────────────────────────────────────────────────────
 # The notes are read much later, at the GitHub-release step — by which point the
@@ -275,25 +292,27 @@ xcrun stapler validate "$APP_PATH" >/dev/null || fail "App has no valid stapled 
 rm -f "$APP_ZIP"
 ok "App notarized and stapled"
 
-# ── Stage DMG contents ────────────────────────────────────────────────────────
-step "Staging DMG contents"
-rm -rf "$STAGING"
-mkdir "$STAGING"
-cp -R "$APP_PATH" "$STAGING/"
-ln -s /Applications "$STAGING/Applications"
-ok "App, Applications alias"
-
 # ── Create DMG ────────────────────────────────────────────────────────────────
 step "Creating DMG"
 rm -f "$DMG"
-hdiutil create \
-    -volname "Barkeep $TAG" \
-    -srcfolder "$STAGING" \
-    -ov \
-    -format UDZO \
-    -o "$DMG" \
-    -quiet
-ok "Created $(du -sh $DMG | cut -f1) DMG"
+# dmgbuild rather than bare hdiutil so the installer window is laid out:
+# background art with an arrow, the app and the Applications alias pinned to its
+# endpoints, chrome hidden. Matches the sibling apps. Until 1.13.0 Barkeep
+# shipped a plain `hdiutil create` image, which opened as an ordinary folder.
+DMG_BACKGROUND="$PROJECT_DIR/tools/dmg/dmg-background-barkeep.png"
+[[ -f "$DMG_BACKGROUND" ]] \
+    || fail "Missing DMG background: ${DMG_BACKGROUND#$PROJECT_DIR/} — regenerate with tools/dmg/make-background.py --app-name Barkeep --slug barkeep"
+
+# A python3 that actually has dmgbuild, not Xcode's bundled one; /bin prepended
+# because dmgbuild shells out to bare tool names.
+PY_BIN=$(command -v python3)
+PATH="/bin:/usr/bin:$PATH" "$PY_BIN" -m dmgbuild \
+    -s "$PROJECT_DIR/tools/dmg/dmg-settings.py" \
+    -D app="$APP_PATH" \
+    -D background="$DMG_BACKGROUND" \
+    "Barkeep $TAG" "$DMG"
+[[ -f "$DMG" ]] || fail "dmgbuild did not produce $DMG"
+ok "Created $(du -sh "$DMG" | cut -f1) DMG"
 
 # ── Notarize ──────────────────────────────────────────────────────────────────
 step "Notarizing DMG"
@@ -325,12 +344,20 @@ if xcrun stapler validate "$MOUNT/Barkeep.app" >/dev/null 2>&1; then
 else
     DMG_APP_STAPLED=0
 fi
+# The installer window is these two files: the .DS_Store carrying the layout and
+# the background art it points at. Without them the image opens as a plain
+# folder — which is how ClipHack 1.25.2 and 1.25.3 shipped, undetected, because
+# nothing looked inside the image it had just built.
+DMG_DSSTORE=( "$MOUNT"/.DS_Store(N) )
+DMG_BGART=( "$MOUNT"/.background.*(N) )
 hdiutil detach "$MOUNT" -quiet
 [[ "$DMG_APP_STAPLED" == 1 ]] || \
     fail "App inside the DMG carries no notarization ticket"
 [[ "$DMG_VERSION" == "$VERSION" ]] || \
     fail "DMG version mismatch: expected $VERSION, got $DMG_VERSION"
-ok "DMG contains $DMG_VERSION"
+(( ${#DMG_DSSTORE} && ${#DMG_BGART} )) || \
+    fail "DMG has no installer window layout (.DS_Store and .background.* are not both present)"
+ok "DMG contains $DMG_VERSION, with its installer window layout"
 
 # ── Update docs (README) ─────────────────────────────────────────────────────
 step "Updating README to ${TAG}"
@@ -418,7 +445,7 @@ fi
 
 # ── Clean up temp files ───────────────────────────────────────────────────────
 step "Cleaning up"
-rm -rf "$STAGING" "$MOUNT" "$DERIVED_DATA"
+rm -rf "$MOUNT" "$DERIVED_DATA"
 rm -f "$DMG"
 ok "Temp files removed"
 
