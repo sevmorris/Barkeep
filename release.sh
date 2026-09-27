@@ -4,7 +4,8 @@
 # Usage: ./release.sh <version> [--generated-notes]
 #   e.g. ./release.sh 1.0
 #
-# Requires: xcodebuild, hdiutil, gh (GitHub CLI), git, and a python3 with dmgbuild
+# Requires: xcodebuild, hdiutil, gh (GitHub CLI), git, codesign, xcrun, and
+#   python3 with dmgbuild; preflight checks each.
 
 set -euo pipefail
 
@@ -88,7 +89,7 @@ python3 -c "import dmgbuild" 2>/dev/null \
 python3 -c "import subprocess; subprocess.run(['/usr/bin/true'], check=True)" &>/dev/null \
     || fail "$(command -v python3) cannot start a subprocess, so dmgbuild would crash — rebuild that Python against an SDK no newer than this macOS"
 
-for cmd in xcodebuild hdiutil gh git python3; do
+for cmd in xcodebuild hdiutil gh git codesign xcrun python3; do
     command -v $cmd &>/dev/null || fail "'$cmd' not found in PATH"
 done
 ok "Tools present"
