@@ -36,7 +36,7 @@ struct HelpView: View {
                     text("Available actions for the selected package.")
                     definition("Upgrade",              as: "Upgrade to the latest version (shown when an update is available)")
                     definition("Install",              as: "Install the package via brew")
-                    definition("Uninstall",            as: "Remove the package from your system")
+                    definition("Uninstall…",           as: "Remove the package from your system. Barkeep asks whether to remove its Brewfile entry too, or keep it so brew bundle installs it again")
                     definition("Remove from Brewfile", as: "Delete the entry from your Brewfile without uninstalling")
                 }
 
@@ -61,6 +61,7 @@ struct HelpView: View {
 
                 section("Notes") {
                     text("Barkeep writes your Brewfile in-place using atomic replacement. All comments, blank lines, and section headers are preserved verbatim.")
+                    text("A cask Barkeep adds gets greedy: true when most of the Brewfile's casks already have it, so it matches the rest of the file.")
                     text("tldr examples require the tldr command-line tool to be installed (brew install tldr).")
                 }
             }

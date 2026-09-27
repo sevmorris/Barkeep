@@ -53,6 +53,15 @@ final class BrewfileViewModel {
         sections.map { $0.name }
     }
 
+    /// Whether a cask added now should carry `greedy: true`: yes when most
+    /// of the Brewfile's casks already do. Barkeep follows the file rather
+    /// than imposing a style. mrk's Brewfile puts it on every cask, and
+    /// before this, each cask Barkeep added was the odd one out.
+    var newCasksAreGreedy: Bool {
+        let casks = allEntries.filter { $0.kind == .cask }
+        return casks.filter(\.isGreedy).count * 2 > casks.count
+    }
+
     // MARK: - Load
 
     func load(from url: URL) {
@@ -149,7 +158,7 @@ final class BrewfileViewModel {
         guard !contains(name: name, kind: kind) else { return }
 
         let sanitized = sanitizeSectionName(section)
-        let raw   = BrewfileEntry.canonicalLine(name: name, kind: kind)
+        let raw   = BrewfileEntry.canonicalLine(name: name, kind: kind, greedy: newCasksAreGreedy)
         let entry = BrewfileEntry(name: name, kind: kind, section: sanitized, rawLine: raw)
 
         pushUndo()
@@ -170,6 +179,14 @@ final class BrewfileViewModel {
 
     func remove(entry: BrewfileEntry, brewfileURL: URL) {
         remove(entries: [entry], brewfileURL: brewfileURL)
+    }
+
+    /// Remove the entries for these packages, matched by name and kind.
+    /// A package with no entry is skipped. Used after an uninstall, with
+    /// only the packages that brew actually uninstalled.
+    func remove(packages: [(name: String, kind: PackageKind)], brewfileURL: URL) {
+        let ids = Set(packages.map { "\($0.kind.rawValue):\($0.name)" })
+        remove(entries: allEntries.filter { ids.contains($0.id) }, brewfileURL: brewfileURL)
     }
 
     func remove(entries: [BrewfileEntry], brewfileURL: URL) {
