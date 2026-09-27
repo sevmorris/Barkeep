@@ -13,6 +13,9 @@ struct ActionPanelView: View {
 
     @State private var addToSection = ""
     @State private var newSectionText = ""
+    /// Brewfile entries waiting on the uninstall question.
+    @State private var pendingUninstall: [BrewfileEntry] = []
+    @State private var showUninstallDialog = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -33,6 +36,33 @@ struct ActionPanelView: View {
                 .padding(12)
             }
         }
+        .confirmationDialog(uninstallTitle, isPresented: $showUninstallDialog,
+                            titleVisibility: .visible, presenting: pendingUninstall) { entries in
+            Button("Uninstall and Remove from Brewfile", role: .destructive) {
+                Task { await uninstall(entries, removeFromBrewfile: true) }
+            }
+            Button("Uninstall, Keep in Brewfile") {
+                Task { await uninstall(entries, removeFromBrewfile: false) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { entries in
+            Text(entries.count == 1
+                 ? "Removing its Brewfile entry too stops brew bundle from installing it again."
+                 : "Removing their Brewfile entries too stops brew bundle from installing them again.")
+        }
+    }
+
+    private var uninstallTitle: String {
+        pendingUninstall.count == 1
+            ? "Uninstall \(pendingUninstall[0].name)?"
+            : "Uninstall \(pendingUninstall.count) packages?"
+    }
+
+    /// Uninstall from the Brewfile view: ask first whether the entries go too.
+    private func confirmUninstall(_ entries: [BrewfileEntry]) {
+        guard !entries.isEmpty else { return }
+        pendingUninstall = entries
+        showUninstallDialog = true
     }
 
     // MARK: - Content dispatch
@@ -145,8 +175,8 @@ struct ActionPanelView: View {
                 Task { await runBrew(["reinstall", entry.name]) }
             }
 
-            actionButton("Uninstall", icon: "trash", role: .destructive) {
-                Task { await runBrew(uninstallArgs(name: entry.name, kind: entry.kind)) }
+            actionButton("Uninstall…", icon: "trash", role: .destructive) {
+                confirmUninstall([entry])
             }
         } else {
             actionButton("Install", icon: "arrow.down.circle") {
@@ -212,10 +242,8 @@ struct ActionPanelView: View {
         }
 
         if !installable.isEmpty {
-            actionButton("Uninstall \(installable.count)", icon: "trash", role: .destructive) {
-                Task {
-                    await uninstallEach(installable.map { ($0.name, $0.kind) })
-                }
+            actionButton("Uninstall \(installable.count)…", icon: "trash", role: .destructive) {
+                confirmUninstall(installable)
             }
             Divider().padding(.vertical, 2)
         }
@@ -347,13 +375,26 @@ struct ActionPanelView: View {
         isRunning = false
     }
 
+    /// Uninstall Brewfile entries, then, when asked, remove the entries of
+    /// the packages brew did uninstall. A failed uninstall keeps its entry.
+    private func uninstall(_ entries: [BrewfileEntry], removeFromBrewfile: Bool) async {
+        let uninstalled = await uninstallEach(entries.map { ($0.name, $0.kind) })
+        guard removeFromBrewfile, !uninstalled.isEmpty else { return }
+        brewfileVM.remove(packages: uninstalled, brewfileURL: brewfilePath)
+        log.append("Removed \(uninstalled.count) from the Brewfile.")
+    }
+
     /// Sequentially uninstall each package — one failure doesn't stop the rest.
-    private func uninstallEach(_ packages: [(name: String, kind: PackageKind)]) async {
-        guard !isRunning, !packages.isEmpty else { return }
+    /// Returns the packages that were uninstalled.
+    @discardableResult
+    private func uninstallEach(_ packages: [(name: String, kind: PackageKind)]) async
+        -> [(name: String, kind: PackageKind)] {
+        guard !isRunning, !packages.isEmpty else { return [] }
         isRunning = true
         log.clear()
 
         var failures: [String] = []
+        var uninstalled: [(name: String, kind: PackageKind)] = []
         for (name, kind) in packages {
             let args = uninstallArgs(name: name, kind: kind)
             log.append("$ brew " + args.joined(separator: " "))
@@ -362,22 +403,23 @@ struct ActionPanelView: View {
                     log.append(line, level: level)
                 }
                 await BrewRunner.shared.invalidateCache(names: [name])
+                uninstalled.append((name, kind))
             } catch {
                 log.append("Error: \(error.localizedDescription)", level: .error)
                 failures.append(name)
             }
         }
 
-        let removed = packages.count - failures.count
-        log.append("Done. Removed \(removed) of \(packages.count) packages.")
+        log.append("Done. Uninstalled \(uninstalled.count) of \(packages.count) packages.")
         await brewfileVM.refreshOutdated()
         await NotificationService.showCompletionNotification(
-            operation: "Uninstall complete — removed \(removed) of \(packages.count)."
+            operation: "Uninstall complete — \(uninstalled.count) of \(packages.count) uninstalled."
         )
         if !failures.isEmpty {
             onError("Failed to uninstall: \(failures.joined(separator: ", "))")
         }
         isRunning = false
+        return uninstalled
     }
 
     /// Try --adopt first; if versions mismatch, fall back to --force install.

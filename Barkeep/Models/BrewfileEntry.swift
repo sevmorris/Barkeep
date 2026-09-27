@@ -35,12 +35,19 @@ struct BrewfileEntry: Identifiable, Hashable {
         self.rawLine = rawLine
     }
 
-    // Generate a canonical Brewfile line for new entries
-    static func canonicalLine(name: String, kind: PackageKind) -> String {
+    // Generate a canonical Brewfile line for new entries. `greedy` adds
+    // `, greedy: true` to a cask line and is ignored for anything else.
+    static func canonicalLine(name: String, kind: PackageKind, greedy: Bool = false) -> String {
         switch kind {
         case .formula: return #"brew "\#(name)""#
-        case .cask:    return #"cask "\#(name)""#
+        case .cask:    return greedy ? #"cask "\#(name)", greedy: true"# : #"cask "\#(name)""#
         case .tap:     return #"tap "\#(name)""#
         }
+    }
+
+    /// True when the line carries `greedy: true`, so `brew upgrade` updates
+    /// the cask even though the app updates itself.
+    var isGreedy: Bool {
+        rawLine.range(of: #",\s*greedy:\s*true\b"#, options: .regularExpression) != nil
     }
 }

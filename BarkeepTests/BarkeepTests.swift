@@ -194,6 +194,116 @@ struct BrewfileViewModelSectionTests {
     }
 }
 
+@Suite("BrewfileViewModel adds and removals")
+struct BrewfileViewModelAddRemoveTests {
+
+    /// A view model loaded from a Brewfile in the temporary folder, and the
+    /// file's URL. The caller removes the file.
+    @MainActor private func loaded(_ contents: String) throws -> (BrewfileViewModel, URL) {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Brewfile-addremove-\(UUID().uuidString)")
+        try contents.write(to: url, atomically: true, encoding: .utf8)
+        let vm = BrewfileViewModel()
+        vm.load(from: url)
+        return (vm, url)
+    }
+
+    @Test("A cask added where most casks are greedy is greedy too; a formula never is")
+    @MainActor func addFollowsGreedyCasks() throws {
+        // mrk's Brewfile carries greedy: true on every cask.
+        let (vm, url) = try loaded("""
+        # Tools
+        brew "git"
+        # Apps
+        cask "alpha", greedy: true
+        cask "beta", greedy: true
+        cask "gamma"
+        """)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        vm.add(name: "zed", kind: .cask, section: "Apps", brewfileURL: url)
+        vm.add(name: "jq", kind: .formula, section: "Tools", brewfileURL: url)
+
+        let written = try String(contentsOf: url, encoding: .utf8)
+        #expect(written.contains(#"cask "zed", greedy: true"#))
+        #expect(written.contains("brew \"jq\"\n"))
+        #expect(!written.contains(#"brew "jq","#))
+    }
+
+    @Test("A cask added where most casks are not greedy stays bare")
+    @MainActor func addLeavesBareCasksBare() throws {
+        let (vm, url) = try loaded("""
+        cask "alpha", greedy: true
+        cask "beta"
+        """)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        vm.add(name: "zed", kind: .cask, section: "General", brewfileURL: url)
+
+        let written = try String(contentsOf: url, encoding: .utf8)
+        #expect(written.contains("cask \"zed\"\n"))
+        #expect(!written.contains(#"cask "zed", greedy"#))
+    }
+
+    @Test("A cask added to a Brewfile with no casks stays bare")
+    @MainActor func addToFileWithoutCasks() throws {
+        let (vm, url) = try loaded("brew \"git\"\n")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        vm.add(name: "zed", kind: .cask, section: "Apps", brewfileURL: url)
+
+        let written = try String(contentsOf: url, encoding: .utf8)
+        #expect(written.contains("cask \"zed\"\n"))
+    }
+
+    @Test("isGreedy reads greedy: true and nothing else")
+    func isGreedy() {
+        func entry(_ line: String) -> BrewfileEntry {
+            BrewfileParser.entries(from: BrewfileParser.parse(string: line))[0]
+        }
+        #expect(entry(#"cask "a", greedy: true"#).isGreedy)
+        #expect(entry(#"cask "a",greedy:true"#).isGreedy)
+        #expect(!entry(#"cask "a", greedy: false"#).isGreedy)
+        #expect(!entry(#"cask "greedy""#).isGreedy)
+        #expect(!entry(#"cask "a""#).isGreedy)
+    }
+
+    @Test("remove(packages:) removes exactly the named kind and name")
+    @MainActor func removeByPackage() throws {
+        // A formula and a cask can share a name; only the one uninstalled goes.
+        let (vm, url) = try loaded("""
+        # Tools
+        brew "git"
+        brew "gh"
+        # Apps
+        cask "git"
+        cask "firefox", greedy: true
+        """)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        vm.remove(packages: [("git", .cask), ("not-there", .formula)], brewfileURL: url)
+
+        #expect(vm.allEntries.map(\.id) == ["formula:git", "formula:gh", "cask:firefox"])
+        let written = try String(contentsOf: url, encoding: .utf8)
+        #expect(!written.contains(#"cask "git""#))
+        #expect(written.contains(#"brew "git""#))
+        #expect(written.contains("# Apps"))
+        #expect(vm.canUndo)
+    }
+
+    @Test("remove(packages:) with no match leaves the file and the undo stack alone")
+    @MainActor func removeByPackageNoMatch() throws {
+        let original = "brew \"git\"\n"
+        let (vm, url) = try loaded(original)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        vm.remove(packages: [("git", .cask)], brewfileURL: url)
+
+        #expect(try String(contentsOf: url, encoding: .utf8) == original)
+        #expect(!vm.canUndo)
+    }
+}
+
 // MARK: - Version comparison
 
 @Suite("Version comparison")
