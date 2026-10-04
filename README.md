@@ -18,7 +18,7 @@ Barkeep is a companion to [mrk](https://github.com/sevmorris/mrk), a macOS boots
 
 ## Requirements
 
-- macOS 14.0+
+- macOS 15.0+
 - [Homebrew](https://brew.sh) installed
 
 ## License
