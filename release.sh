@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 # release.sh — Build, verify, package, and publish a Barkeep release.
 #
-# Usage: ./release.sh <version> [--generated-notes]
+# Usage: ./release.sh <version> [--generated-notes] [--skip-tests]
 #   e.g. ./release.sh 1.0
 #
 # Requires: xcodebuild, hdiutil, gh (GitHub CLI), git, codesign, xcrun, and
@@ -22,20 +22,24 @@ NOTARY_PROFILE="${NOTARY_PROFILE:-notarytool}"
 # Anything else — including no arguments, or a second positional that isn't a
 # flag — still fails with usage, as it did before the flags existed.
 ALLOW_GENERATED_NOTES=0
+SKIP_TESTS=0
 ARGS=()
 for arg in "$@"; do
     case "$arg" in
         --generated-notes) ALLOW_GENERATED_NOTES=1 ;;
+        --skip-tests)      SKIP_TESTS=1 ;;
         *)                 ARGS+=("$arg") ;;
     esac
 done
 
 if [[ ${#ARGS[@]} -ne 1 ]]; then
-    echo "Usage: $0 <version> [--generated-notes]"
+    echo "Usage: $0 <version> [--generated-notes] [--skip-tests]"
     echo "  e.g. $0 1.0"
     echo ""
     echo "  --generated-notes  Release without a curated release-notes file,"
     echo "                     generating notes from commit subjects instead."
+    echo "  --skip-tests       Skip the test suite (not recommended; use only when"
+    echo "                     tests are known-broken and you need an emergency release)."
     exit 1
 fi
 
@@ -51,6 +55,7 @@ DMG="/tmp/Barkeep-${TAG}.dmg"
 APP_ZIP="/tmp/Barkeep-${TAG}-app.zip"
 MOUNT="/tmp/barkeep_verify_${VERSION}"
 NOTES_FILE="$PROJECT_DIR/release-notes/${TAG}.md"
+TEST_LOG="/tmp/barkeep_test_${VERSION}.log"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 step()  { echo "\n▶ $*"; }
@@ -69,6 +74,7 @@ cleanup() {
     rm -rf -- "${MOUNT:-}" "${DERIVED_DATA:-}" 2>/dev/null || true
     rm -f  -- "${DMG:-}" 2>/dev/null || true
     rm -f  -- "${APP_ZIP:-}" 2>/dev/null || true
+    rm -f  -- "${TEST_LOG:-}" 2>/dev/null || true
 }
 # This function was defined and never registered, so none of it ever ran: every
 # failed release left its staging directory, mount point, DerivedData and DMG
@@ -235,6 +241,28 @@ else
     fail "No curated notes for $TAG — write that file, or re-run with --generated-notes"
 fi
 
+# ── Tests ─────────────────────────────────────────────────────────────────────
+# Nothing ran BarkeepTests before a release: CI runs them, but nothing here
+# checks that it is green, and CI never runs the Xcode on this Mac, the one
+# that builds the release. FilmStrip's step, with its escape hatch.
+#
+# Before the version bump, like every gate above: a failure here leaves nothing
+# committed and nothing to undo.
+step "Running unit tests"
+if (( SKIP_TESTS )); then
+    warn "Skipping tests (--skip-tests)"
+else
+    if ! xcodebuild test \
+        -project "$PROJECT" \
+        -scheme "$SCHEME" \
+        -destination 'platform=macOS,arch=arm64' \
+        -quiet > "$TEST_LOG" 2>&1; then
+        cat "$TEST_LOG" >&2
+        fail "Tests failed — fix before releasing, or pass --skip-tests for an emergency release"
+    fi
+    ok "Tests passed"
+fi
+
 # ── Version bump ──────────────────────────────────────────────────────────────
 step "Bumping version to $VERSION"
 PLIST="$PROJECT_DIR/Barkeep/Info.plist"
@@ -284,6 +312,14 @@ BUILT_VERSION=$(defaults read "$APP_PATH/Contents/Info.plist" CFBundleShortVersi
 [[ "$BUILT_VERSION" == "$VERSION" ]] || \
     fail "App version mismatch: expected $VERSION, got $BUILT_VERSION"
 ok "App reports $BUILT_VERSION"
+
+# The macOS this release needs, read from the app as built, for the notes'
+# "Requires macOS" line and the update check's marker below. Read here, before
+# notarizing, so a build without it stops before anything leaves the machine.
+MIN_MACOS=$(/usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "$APP_PATH/Contents/Info.plist" 2>/dev/null || true)
+[[ "$MIN_MACOS" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]] \
+    || fail "Built app has no usable LSMinimumSystemVersion ('${MIN_MACOS}') — the release notes and the update check need it"
+ok "Requires macOS $MIN_MACOS"
 
 # ── Notarize app ──────────────────────────────────────────────────────────────
 step "Notarizing app"
@@ -400,6 +436,14 @@ ok "Pushed $TAG to $REMOTE/$BRANCH"
 
 # ── GitHub release ────────────────────────────────────────────────────────────
 step "Creating GitHub release"
+# Every release says which macOS it needs: a line people read, and a marker the
+# app's update check reads, which GitHub does not render. A Mac below it is told
+# so instead of being offered a DMG whose app will not open there.
+REQUIRES_FOOTER="
+
+---
+Requires macOS ${MIN_MACOS} or later.
+<!-- minimum-macos: ${MIN_MACOS} -->"
 # A curated description at release-notes/v<version>.md wins over the generated
 # commit list. Use it when the release needs prose the log can't produce —
 # licensing notes, a known-gap disclosure, an explanation of what changed and
@@ -413,7 +457,7 @@ if [[ -f "$NOTES_FILE" ]]; then
     gh release create "$TAG" "$DMG" \
         --repo "$REPO" \
         --title "Barkeep $TAG" \
-        --notes-file "$NOTES_FILE"
+        --notes "$(<"$NOTES_FILE")${REQUIRES_FOOTER}"
 else
     PREV_TAG=$(git tag --list 'v[0-9]*' --sort=-creatordate | grep -v "^${TAG}$" | head -1 || true)
     if [[ -n "$PREV_TAG" ]]; then
@@ -431,7 +475,7 @@ ${CHANGES}"
     gh release create "$TAG" "$DMG" \
         --repo "$REPO" \
         --title "Barkeep $TAG" \
-        --notes "$RELEASE_NOTES"
+        --notes "${RELEASE_NOTES}${REQUIRES_FOOTER}"
 fi
 ok "Release published"
 
