@@ -40,6 +40,16 @@ struct HelpView: View {
                     definition("Remove from Brewfile", as: "Delete the entry from your Brewfile without uninstalling")
                 }
 
+                section("mrk Mode") {
+                    text("When the Brewfile is in an mrk checkout — scripts/sync, scripts/check-picker-desc and tools/picker/descriptions.tsv beside it — mrk's own scripts make the decisions. The mrk badge in the toolbar shows the mode is on.")
+                    definition("Untracked",            as: "What mrk's sync offers: installed packages the Brewfile lacks, without the names in ~/.mrk/sync-ignore, and Brewfile entries that are not installed")
+                    definition("Add to Brewfile",      as: "sync adds it: a cask under its app's category, a formula in the section you pick, each with its picker description")
+                    definition("Ignore",               as: "sync adds the name to ~/.mrk/sync-ignore, so it is not offered again")
+                    definition("Remove from Brewfile", as: "For a package that is not installed, sync prunes the entry and its description")
+                    definition("Other edits",          as: "Barkeep runs check-picker-desc --fix afterwards, so no description is missing")
+                    text("Barkeep does not commit. Commit ~/mrk with mrk-push or pushall.")
+                }
+
                 section("Console") {
                     text("Click the terminal icon in the toolbar to show the console. It streams live output from any brew command Barkeep runs.")
                 }

@@ -5,6 +5,9 @@ import SwiftUI
 final class UntrackedViewModel {
     var formulae: [BrewPackage] = []
     var casks: [BrewPackage] = []
+    /// mrk mode: Brewfile entries whose packages are not installed, which
+    /// sync would prune. Empty outside mrk mode.
+    var notInstalled: [BrewPackage] = []
     var isLoading = false
     var error: String? = nil
     var selectedPackageIDs: Set<String> = []
@@ -22,13 +25,18 @@ final class UntrackedViewModel {
             : casks.filter { $0.name.localizedCaseInsensitiveContains(filterText) }
     }
 
+    var filteredNotInstalled: [BrewPackage] {
+        filterText.isEmpty ? notInstalled
+            : notInstalled.filter { $0.name.localizedCaseInsensitiveContains(filterText) }
+    }
+
     var untrackedCount: Int {
         formulae.count + casks.count
     }
 
     var selectedPackages: [BrewPackage] {
         let ids = selectedPackageIDs
-        return (formulae + casks).filter { ids.contains($0.id) }
+        return (formulae + casks + notInstalled).filter { ids.contains($0.id) }
     }
 
     /// Single focused package — present only when exactly one row is selected.
@@ -63,6 +71,54 @@ final class UntrackedViewModel {
         }
     }
 
+    /// mrk mode: the lists are sync's drift, so they drop what sync-ignore
+    /// names and count what Dipstick and mrk-status count. Homebrew is asked
+    /// nothing here; the descriptions are the ones the table will hold.
+    func load(candidates: [MrkCandidate], error: String? = nil) {
+        func package(_ c: MrkCandidate) -> BrewPackage {
+            var p = BrewPackage(name: c.name, kind: c.kind, description: c.description)
+            if c.action == .add {
+                p.isInstalled = true
+                p.isBrewManaged = true
+                p.mrkSection = c.section.isEmpty ? nil : c.section
+                p.mrkReason = c.reason
+            } else {
+                p.isInBrewfile = true
+                p.brewfileSection = c.section
+            }
+            // Keep what an earlier selection fetched for the detail panel.
+            if let known = (formulae + casks + notInstalled).first(where: { $0.id == p.id }) {
+                p.version = known.version
+                p.homepage = known.homepage
+                p.license = known.license
+                p.tap = known.tap
+                p.dependencies = known.dependencies
+                p.buildDependencies = known.buildDependencies
+                p.caveats = known.caveats
+                p.conflicts = known.conflicts
+                p.tldr = known.tldr
+                p.tldrSummary = known.tldrSummary
+                p.manSections = known.manSections
+                p.reverseDependencies = known.reverseDependencies
+                p.installDate = known.installDate
+            }
+            return p
+        }
+        let adds = candidates.filter { $0.action == .add }
+        formulae = adds.filter { $0.kind == .formula }.map(package)
+        casks = adds.filter { $0.kind == .cask }.map(package)
+        notInstalled = candidates.filter { $0.action == .prune }.map(package)
+        self.error = error
+        isLoading = false
+        let live = Set((formulae + casks + notInstalled).map(\.id))
+        selectedPackageIDs = selectedPackageIDs.intersection(live)
+    }
+
+    /// Outside mrk mode there is nothing sync would prune.
+    func clearMrk() {
+        notInstalled = []
+    }
+
     // MARK: - On-demand detail
 
     /// Fetch description/version/homepage for a package when it's selected.
@@ -93,6 +149,15 @@ final class UntrackedViewModel {
 
         guard var info = infos?.first else { return }
         info.isInBrewfile        = package.isInBrewfile
+        info.brewfileSection     = package.brewfileSection
+        info.mrkSection          = package.mrkSection
+        info.mrkReason           = package.mrkReason
+        if info.description.isEmpty { info.description = package.description }
+        if package.isInBrewfile {
+            // Not installed: brew info still describes it, from the API.
+            info.isInstalled = false
+            info.isBrewManaged = false
+        }
         info.tldr                = tldrResult.examples
         info.tldrSummary         = tldrResult.summary
         info.manSections         = manResult
@@ -126,6 +191,8 @@ final class UntrackedViewModel {
             formulae[idx] = transform(formulae[idx])
         } else if kind == .cask, let idx = casks.firstIndex(where: { $0.name == name }) {
             casks[idx] = transform(casks[idx])
+        } else if let idx = notInstalled.firstIndex(where: { $0.name == name && $0.kind == kind }) {
+            notInstalled[idx] = transform(notInstalled[idx])
         }
     }
 }

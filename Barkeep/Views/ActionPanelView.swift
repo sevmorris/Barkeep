@@ -10,9 +10,24 @@ struct ActionPanelView: View {
     @Binding var isRunning: Bool
     var onError: (String) -> Void
     var brewfilePath: URL
+    /// mrk mode, when the Brewfile is in an mrk checkout: adds, ignores and
+    /// prunes go through mrk's sync, by way of `runMrk`.
+    var mrk: MrkMode? = nil
+    var runMrk: (([MrkCommand]) async -> Void)? = nil
+    /// Removes Brewfile entries; in mrk mode it prunes the ones sync would.
+    var removeEntries: (([BrewfileEntry]) -> Void)? = nil
 
     @State private var addToSection = ""
     @State private var newSectionText = ""
+    /// mrk mode: the packages of a bulk add waiting on the formula section.
+    @State private var pendingAdd: PendingAdd? = nil
+
+    private struct PendingAdd: Identifiable {
+        let id = UUID()
+        let packages: [BrewPackage]
+    }
+
+    private var mrkActive: Bool { mrk?.isActive == true }
     /// Brewfile entries waiting on the uninstall question.
     @State private var pendingUninstall: [BrewfileEntry] = []
     @State private var showUninstallDialog = false
@@ -50,6 +65,33 @@ struct ActionPanelView: View {
                  ? "Removing its Brewfile entry too stops brew bundle from installing it again."
                  : "Removing their Brewfile entries too stops brew bundle from installing them again.")
         }
+        .sheet(item: $pendingAdd) { pending in
+            let formulae = pending.packages.filter { $0.kind == .formula }
+            SectionNameSheet(
+                title: formulae.count == 1
+                    ? "Add \(formulae[0].name) to which section?"
+                    : "Add \(formulae.count) formulae to which section?",
+                message: "mrk's sync files each cask by its app's category, and asks for a formula's section.",
+                confirmLabel: "Add",
+                choices: MrkCheckout.formulaSections(in: brewfileVM.nodes)
+            ) { section in
+                Task { await runMrk?(addCommands(pending.packages, section: section)) }
+            }
+        }
+    }
+
+    /// Remove entries the mrk-aware way when there is one.
+    private func remove(_ entries: [BrewfileEntry]) {
+        if let removeEntries {
+            removeEntries(entries)
+        } else {
+            brewfileVM.remove(entries: entries, brewfileURL: brewfilePath)
+        }
+    }
+
+    /// One `sync --add` for each package; a formula goes in `section`.
+    private func addCommands(_ packages: [BrewPackage], section: String?) -> [MrkCommand] {
+        packages.map { .add(name: $0.name, kind: $0.kind, section: $0.kind == .formula ? section : nil) }
     }
 
     private var uninstallTitle: String {
@@ -103,7 +145,13 @@ struct ActionPanelView: View {
 
     @ViewBuilder
     private func singleInstalledActions(pkg: BrewPackage) -> some View {
-        if !pkg.isInBrewfile {
+        if mrkActive {
+            if pkg.isInBrewfile {
+                mrkNotInstalledActions(pkg: pkg)
+            } else {
+                mrkAddView(pkg: pkg)
+            }
+        } else if !pkg.isInBrewfile {
             addToBrewfileView(pkg: pkg)
         } else {
             Text("Tracked in Brewfile.")
@@ -150,7 +198,7 @@ struct ActionPanelView: View {
         Divider().padding(.vertical, 2)
 
         actionButton("Remove from Brewfile", icon: "minus.circle", role: .destructive) {
-            brewfileVM.remove(entry: entry, brewfileURL: brewfilePath)
+            remove([entry])
         }
     }
 
@@ -187,7 +235,7 @@ struct ActionPanelView: View {
         Divider().padding(.vertical, 2)
 
         actionButton("Remove from Brewfile", icon: "minus.circle", role: .destructive) {
-            brewfileVM.remove(entry: entry, brewfileURL: brewfilePath)
+            remove([entry])
         }
     }
 
@@ -195,6 +243,15 @@ struct ActionPanelView: View {
 
     @ViewBuilder
     private func bulkInstalledActions(_ selected: [BrewPackage]) -> some View {
+        if mrkActive {
+            mrkBulkActions(selected)
+        } else {
+            plainBulkInstalledActions(selected)
+        }
+    }
+
+    @ViewBuilder
+    private func plainBulkInstalledActions(_ selected: [BrewPackage]) -> some View {
         let outdated = selected.filter { brewfileVM.outdatedNames.contains($0.name) }
         let untracked = selected.filter { !$0.isInBrewfile }
 
@@ -250,7 +307,128 @@ struct ActionPanelView: View {
 
         actionButton("Remove \(selected.count) from Brewfile",
                      icon: "minus.circle", role: .destructive) {
-            brewfileVM.remove(entries: selected, brewfileURL: brewfilePath)
+            remove(selected)
+        }
+    }
+
+    // MARK: - mrk mode
+
+    /// An untracked package: where sync would put it, Add, and Ignore.
+    @ViewBuilder
+    private func mrkAddView(pkg: BrewPackage) -> some View {
+        let sections = MrkCheckout.formulaSections(in: brewfileVM.nodes)
+        VStack(alignment: .leading, spacing: 8) {
+            if pkg.kind == .cask {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Files under")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                    Text(pkg.mrkSection ?? "Its app's category")
+                        .font(.body)
+                    if !pkg.mrkReason.isEmpty {
+                        Text(pkg.mrkReason)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            } else {
+                Picker("", selection: $addToSection) {
+                    ForEach(sections, id: \.self) { Text($0).tag($0) }
+                    Text("New Section…").tag(Self.newSectionSentinel)
+                }
+                .labelsHidden()
+                if sections.isEmpty || addToSection == Self.newSectionSentinel {
+                    TextField("Section name", text: $newSectionText)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.body)
+                }
+            }
+
+            actionButton("Add to Brewfile", icon: "plus.circle") {
+                var section: String? = nil
+                if pkg.kind == .formula {
+                    let chosen = sections.isEmpty || addToSection == Self.newSectionSentinel
+                        ? newSectionText
+                        : (addToSection.isEmpty ? (sections.first ?? "") : addToSection)
+                    section = chosen.trimmingCharacters(in: .whitespaces)
+                    guard section?.isEmpty == false else { return }
+                }
+                let command = MrkCommand.add(name: pkg.name, kind: pkg.kind, section: section)
+                Task { await runMrk?([command]) }
+            }
+
+            actionButton("Ignore", icon: "eye.slash") {
+                Task { await runMrk?([.ignore(name: pkg.name, kind: pkg.kind)]) }
+            }
+            Text("Ignore adds it to ~/.mrk/sync-ignore, so sync and Barkeep stop offering it.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .onChange(of: pkg.id) { _, _ in
+            addToSection = ""
+            newSectionText = ""
+        }
+    }
+
+    /// A Brewfile entry whose package is not installed: install it, or prune it.
+    @ViewBuilder
+    private func mrkNotInstalledActions(pkg: BrewPackage) -> some View {
+        Text("In the Brewfile, not installed.")
+            .font(.footnote)
+            .foregroundStyle(.tertiary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+        actionButton("Install", icon: "arrow.down.circle") {
+            Task { await runBrew(pkg.kind == .cask ? ["install", "--cask", pkg.name] : ["install", pkg.name]) }
+        }
+
+        Divider().padding(.vertical, 2)
+
+        actionButton("Remove from Brewfile", icon: "minus.circle", role: .destructive) {
+            Task { await runMrk?([.prune(name: pkg.name, kind: pkg.kind)]) }
+        }
+    }
+
+    @ViewBuilder
+    private func mrkBulkActions(_ selected: [BrewPackage]) -> some View {
+        let adds = selected.filter { !$0.isInBrewfile }
+        let prunes = selected.filter { $0.isInBrewfile }
+        let outdated = adds.filter { brewfileVM.outdatedNames.contains($0.name) }
+
+        bulkHeader(count: selected.count)
+
+        if !outdated.isEmpty {
+            actionButton("Upgrade Outdated (\(outdated.count))",
+                         icon: "arrow.up.circle.fill", tint: .orange) {
+                Task { await runBrew(["upgrade"] + outdated.map(\.name)) }
+            }
+            Divider().padding(.vertical, 2)
+        }
+
+        if !adds.isEmpty {
+            actionButton("Add \(adds.count) to Brewfile", icon: "plus.circle") {
+                if adds.contains(where: { $0.kind == .formula }) {
+                    pendingAdd = PendingAdd(packages: adds)
+                } else {
+                    Task { await runMrk?(addCommands(adds, section: nil)) }
+                }
+            }
+            actionButton("Ignore \(adds.count)", icon: "eye.slash") {
+                Task { await runMrk?(adds.map { .ignore(name: $0.name, kind: $0.kind) }) }
+            }
+            Divider().padding(.vertical, 2)
+            actionButton("Uninstall \(adds.count)", icon: "trash", role: .destructive) {
+                Task { await uninstallEach(adds.map { ($0.name, $0.kind) }) }
+            }
+        }
+
+        if !prunes.isEmpty {
+            Divider().padding(.vertical, 2)
+            actionButton("Remove \(prunes.count) from Brewfile", icon: "minus.circle", role: .destructive) {
+                Task { await runMrk?(prunes.map { .prune(name: $0.name, kind: $0.kind) }) }
+            }
         }
     }
 
@@ -364,6 +542,7 @@ struct ActionPanelView: View {
             if verb == "tap" || verb == "untap" {
                 await brewfileVM.refreshTaps()
             }
+            if let mrk, mrk.isActive { await mrk.refresh() }
             await NotificationService.showCompletionNotification(
                 operation: "\(verb.capitalized) complete (\(names.count) package\(names.count == 1 ? "" : "s"))."
             )
@@ -412,6 +591,7 @@ struct ActionPanelView: View {
 
         log.append("Done. Uninstalled \(uninstalled.count) of \(packages.count) packages.")
         await brewfileVM.refreshOutdated()
+        if let mrk, mrk.isActive { await mrk.refresh() }
         await NotificationService.showCompletionNotification(
             operation: "Uninstall complete — \(uninstalled.count) of \(packages.count) uninstalled."
         )

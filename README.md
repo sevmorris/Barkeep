@@ -10,11 +10,24 @@ Barkeep is a native macOS app for managing Homebrew packages. Browse and manage 
 - **Console** — streaming brew command output
 - **Actions** — install, uninstall, upgrade, or remove from Brewfile for any selected package. Uninstall asks whether to remove the Brewfile entry too
 - New casks follow the Brewfile's style: `greedy: true` when most of its casks carry it
+- **mrk mode** — in an mrk checkout, adds, ignores and prunes go through mrk's `sync` (below)
 - Defaults to `~/mrk/Brewfile`; any Brewfile location can be selected
 
 ## Companion App
 
 Barkeep is a companion to [mrk](https://github.com/sevmorris/mrk), a macOS bootstrap system. It defaults to the mrk Brewfile at `~/mrk/Brewfile` but works with any Brewfile.
+
+### mrk mode
+
+When the open Brewfile is in an mrk checkout (`scripts/sync`, `scripts/check-picker-desc` and `tools/picker/descriptions.tsv` beside it), Barkeep lets mrk's own scripts make the decisions, so it keeps mrk's checks instead of copying them:
+
+- **Untracked** lists what `sync --check --details` reports: the packages you installed that the Brewfile lacks, without the names in `~/.mrk/sync-ignore`, and the Brewfile entries whose packages are not installed.
+- **Add to Brewfile** runs `sync --add`. A cask goes under the `## Casks -` section of its app's category, which Barkeep shows before you add it; a formula goes in the section you pick. Each entry gets its mrk-picker description.
+- **Ignore** runs `sync --ignore`. **Remove from Brewfile** on a package that is not installed runs `sync --prune`.
+- After any other edit Barkeep makes to the Brewfile, it runs `check-picker-desc --fix`, so no description is missing or left behind.
+- Barkeep does not commit. Commit `~/mrk` with `mrk-push` or `pushall`.
+
+Barkeep runs the scripts with the environment of an interactive login zsh, as a new Terminal window has, and shows their output in the console. The mrk toolbar badge shows the mode is on. Any other Brewfile works as before.
 
 ## Requirements
 

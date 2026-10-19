@@ -3,6 +3,8 @@ import SwiftUI
 struct BrewfileListView: View {
     @Bindable var vm: BrewfileViewModel
     var brewfileURL: URL
+    /// Remove from Brewfile. In mrk mode the caller prunes what sync would.
+    var onRemove: (([BrewfileEntry]) -> Void)? = nil
 
     /// State for the rename / new-section sheet. The kind drives the
     /// title and what happens on submit.
@@ -120,7 +122,11 @@ struct BrewfileListView: View {
         }
         Divider()
         Button("Remove from Brewfile", role: .destructive) {
-            vm.remove(entries: acting, brewfileURL: brewfileURL)
+            if let onRemove {
+                onRemove(acting)
+            } else {
+                vm.remove(entries: acting, brewfileURL: brewfileURL)
+            }
         }
     }
 }

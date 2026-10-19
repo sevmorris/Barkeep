@@ -38,6 +38,9 @@ final class ProcessingLog {
         let m = message.trimmingCharacters(in: .whitespaces)
         return m.hasPrefix("$")            // command echo
             || m.hasPrefix("==>")          // brew step headers
+            || m.hasPrefix("✓")            // mrk: done
+            || m.hasPrefix("⚠")            // mrk: warning
+            || m.hasPrefix("✗")            // mrk: error
             || m.hasPrefix("Error:")       // errors
             || m.hasPrefix("Warning:")     // warnings
             || m.hasPrefix("Already ")     // "Already installed."
