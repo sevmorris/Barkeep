@@ -335,8 +335,9 @@ struct ScriptProcessTests {
             URL(fileURLWithPath: "/bin/sh"),
             arguments: ["-c", "sleep 10 & echo partial; exit 3"],
             timeout: .seconds(30),
-            drainGrace: .milliseconds(300))
-        #expect(ContinuousClock.now - started < .seconds(5))
+            drainGrace: .seconds(1))
+        // The grace, not the ten seconds the child holds the pipes for.
+        #expect(ContinuousClock.now - started < .seconds(6))
         #expect(result.status == 3)
         #expect(!result.timedOut)
         #expect(result.stdoutText == "partial\n")

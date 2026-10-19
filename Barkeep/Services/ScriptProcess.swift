@@ -53,17 +53,16 @@ enum ScriptProcess {
 
         try process.run()
         let pid = process.processIdentifier
-        onStart?(pid)
 
+        // The readers start on threads of their own at once, not as tasks:
+        // on a busy machine a task can wait for a thread, and output the
+        // program wrote would then be missed by the grace below.
         let out = LineCollector { line in onLine?(line, false) }
         let err = LineCollector { line in onLine?(line, true) }
-        let outHandle = outPipe.fileHandleForReading
-        let errHandle = errPipe.fileHandleForReading
-        let readers = Task.detached {
-            async let outDone: Void = read(outHandle, into: out)
-            async let errDone: Void = read(errHandle, into: err)
-            _ = await (outDone, errDone)
-        }
+        let readers = DispatchGroup()
+        read(outPipe.fileHandleForReading, into: out, group: readers)
+        read(errPipe.fileHandleForReading, into: err, group: readers)
+        onStart?(pid)
 
         let watchdog = Task.detached { () -> Bool in
             do { try await Task.sleep(for: timeout) } catch { return false }
@@ -77,23 +76,23 @@ enum ScriptProcess {
         // A child the program started, such as brew under a stopped sync, can
         // keep the pipes open after the program is gone. Wait a little for
         // the rest of the output, never for that child.
-        await firstOf({ await readers.value }, orAfter: drainGrace)
+        await wait(for: readers, atMost: drainGrace)
 
         return ScriptResult(status: status, stdout: out.data, stderr: err.data,
                             timedOut: await watchdog.value)
     }
 
-    /// Returns when `work` is done or `delay` has passed, whichever is first.
-    /// The work goes on if the delay wins; its result is not waited for.
-    private static func firstOf(_ work: @escaping @Sendable () async -> Void, orAfter delay: Duration) async {
+    /// Returns when every reader in `group` is done, or after `limit`,
+    /// whichever is first. A reader still blocked then goes on by itself.
+    private static func wait(for group: DispatchGroup, atMost limit: Duration) async {
+        let (seconds, attoseconds) = limit.components
+        let deadline = DispatchTime.now() + Double(seconds) + Double(attoseconds) / 1e18
         await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
             let once = Once()
-            Task.detached {
-                await work()
+            group.notify(queue: .global(qos: .userInitiated)) {
                 if once.claim() { done.resume() }
             }
-            Task.detached {
-                try? await Task.sleep(for: delay)
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: deadline) {
                 if once.claim() { done.resume() }
             }
         }
@@ -101,17 +100,16 @@ enum ScriptProcess {
 
     /// Reads a pipe to its end on a thread of its own: `availableData` blocks,
     /// and a blocked thread must not be one of Swift's cooperative pool.
-    private static func read(_ handle: FileHandle, into collector: LineCollector) async {
-        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
-            DispatchQueue.global(qos: .userInitiated).async {
-                while true {
-                    let chunk = handle.availableData
-                    if chunk.isEmpty { break }
-                    collector.append(chunk)
-                }
-                collector.finish()
-                done.resume()
+    private static func read(_ handle: FileHandle, into collector: LineCollector, group: DispatchGroup) {
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            while true {
+                let chunk = handle.availableData
+                if chunk.isEmpty { break }
+                collector.append(chunk)
             }
+            collector.finish()
+            group.leave()
         }
     }
 }
