@@ -13,6 +13,14 @@ final class BrewfileViewModel {
     var outdatedNames: Set<String> = []
     var activeTaps: Set<String> = []
 
+    /// Asked before every write: a reason to hold it back, or nil. In mrk
+    /// mode it holds writes back while sync rewrites the Brewfile, since a
+    /// save from the copy Barkeep read before would undo what sync wrote.
+    @ObservationIgnored var writeGuard: (@MainActor () -> String?)? = nil
+    /// Called after every write Barkeep makes. In mrk mode it runs
+    /// check-picker-desc --fix.
+    @ObservationIgnored var onSave: (@MainActor () -> Void)? = nil
+
     private var undoStack: [[BrewfileNode]] = []
     private var redoStack: [[BrewfileNode]] = []
 
@@ -327,8 +335,16 @@ final class BrewfileViewModel {
     }
 
     private func save(to url: URL) {
+        if let reason = writeGuard?() {
+            self.error = reason
+            if let previous = undoStack.popLast() {
+                nodes = previous
+            }
+            return
+        }
         do {
             try BrewfileParser.write(nodes: nodes, to: url)
+            onSave?()
         } catch {
             self.error = "Failed to save Brewfile: \(error.localizedDescription)"
             // Roll back the mutation so in-memory state stays consistent with the file

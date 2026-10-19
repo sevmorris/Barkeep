@@ -4,6 +4,7 @@ struct RootContentView: View {
     @Environment(AppState.self) var appState
     @State private var brewfileVM  = BrewfileViewModel()
     @State private var untrackedVM = UntrackedViewModel()
+    @State private var mrk         = MrkMode()
     @State private var sidebarTab  = SidebarTab.brewfile
     @State private var log         = ProcessingLog()
     @State private var isRunning   = false
@@ -36,16 +37,41 @@ struct RootContentView: View {
                 mainWindow
             }
         }
+        .onAppear { connectMrk() }
         .onChange(of: appState.brewfilePath, initial: true) { _, url in
+            mrk.open(brewfile: url)
+            if !mrk.isActive { untrackedVM.clearMrk() }
             guard let url else { brewfileWatcher.stop(); return }
             brewfileVM.load(from: url)
             brewfileWatcher.start(url: url)
+            if mrk.isActive { Task { await mrk.refresh() } }
+        }
+        .onChange(of: mrk.isChecking) { _, checking in
+            // In mrk mode the Untracked list is sync's drift, read again
+            // after every decision and every brew command.
+            guard mrk.isActive else { return }
+            if checking {
+                if untrackedVM.formulae.isEmpty && untrackedVM.casks.isEmpty
+                    && untrackedVM.notInstalled.isEmpty {
+                    untrackedVM.isLoading = true
+                }
+            } else {
+                untrackedVM.load(candidates: mrk.candidates, error: mrk.checkError)
+            }
+        }
+        .onChange(of: brewfileVM.error) { _, message in
+            guard let message else { return }
+            alertMessage = message
+            brewfileVM.error = nil
         }
         .onReceive(NotificationCenter.default.publisher(for: .barkeepRefresh)) { _ in
             if let url = appState.brewfilePath { brewfileVM.load(from: url) }
         }
         .onChange(of: sidebarTab) { _, tab in
-            if tab == .untracked {
+            guard tab == .untracked else { return }
+            if mrk.isActive {
+                Task { await mrk.refresh() }
+            } else {
                 Task { await untrackedVM.load(brewfileEntries: brewfileVM.allEntries) }
             }
         }
@@ -89,10 +115,11 @@ struct RootContentView: View {
             Group {
                 if sidebarTab == .brewfile {
                     if let url = appState.brewfilePath {
-                        BrewfileListView(vm: brewfileVM, brewfileURL: url)
+                        BrewfileListView(vm: brewfileVM, brewfileURL: url, onRemove: removeEntries)
                     }
                 } else {
-                    UntrackedListView(vm: untrackedVM, outdatedNames: brewfileVM.outdatedNames)
+                    UntrackedListView(vm: untrackedVM, outdatedNames: brewfileVM.outdatedNames,
+                                      mrkMode: mrk.isActive)
                 }
             }
             .navigationTitle(sidebarTab.rawValue)
@@ -118,7 +145,10 @@ struct RootContentView: View {
                         log:          log,
                         isRunning:    $isRunning,
                         onError:      { alertMessage = $0 },
-                        brewfilePath: brewfilePath
+                        brewfilePath: brewfilePath,
+                        mrk:          mrk.isActive ? mrk : nil,
+                        runMrk:       { await runMrk($0) },
+                        removeEntries: removeEntries
                     )
                     .inspectorColumnWidth(min: 220, ideal: 240, max: 300)
                 }
@@ -134,9 +164,18 @@ struct RootContentView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        if brewfileVM.isLoading {
+        if brewfileVM.isLoading || mrk.isChecking {
             ToolbarItem(placement: .automatic) {
                 ProgressView().controlSize(.small)
+            }
+        }
+
+        if mrk.isActive {
+            ToolbarItem(placement: .automatic) {
+                Label("mrk", systemImage: "checkmark.seal")
+                    .labelStyle(.titleAndIcon)
+                    .foregroundStyle(.secondary)
+                    .help("mrk mode: this Brewfile is in an mrk checkout, so mrk's sync decides what is untracked, and adds, ignores and prunes packages.")
             }
         }
 
@@ -185,6 +224,7 @@ struct RootContentView: View {
             if isRunning {
                 Button {
                     Task { await BrewRunner.shared.cancel() }
+                    mrk.cancel()
                 } label: {
                     Image(systemName: "stop.circle").foregroundStyle(.red)
                 }
@@ -207,6 +247,7 @@ struct RootContentView: View {
             Button {
                 guard let url = appState.brewfilePath else { return }
                 brewfileVM.load(from: url)
+                if mrk.isActive { Task { await mrk.refresh() } }
             } label: {
                 Image(systemName: "arrow.clockwise")
             }
@@ -306,6 +347,62 @@ struct RootContentView: View {
                 )
         }
         .frame(height: 6)
+    }
+
+    // MARK: - mrk mode
+
+    /// The hooks between the Brewfile view model and mrk mode. Set once:
+    /// both objects live as long as the window.
+    private func connectMrk() {
+        let mrk = self.mrk
+        let brewfileVM = self.brewfileVM
+        let log = self.log
+        let appState = self.appState
+        brewfileVM.writeGuard = {
+            mrk.isWritingBrewfile
+                ? "mrk's sync is changing the Brewfile. Make the change again when it is done."
+                : nil
+        }
+        brewfileVM.onSave = {
+            mrk.fixDescriptions(log: log)
+        }
+        mrk.onBrewfileWritten = {
+            if let url = appState.brewfilePath { brewfileVM.load(from: url) }
+        }
+    }
+
+    /// Runs mrk commands one after another, each in the console. A refusal
+    /// does not stop the rest; the alert lists what sync said.
+    private func runMrk(_ commands: [MrkCommand]) async {
+        guard !isRunning, !commands.isEmpty, mrk.isActive else { return }
+        isRunning = true
+        log.clear()
+        var failures: [String] = []
+        for command in commands {
+            if let error = await mrk.perform(command, log: log) {
+                failures.append(error.localizedDescription)
+            }
+        }
+        isRunning = false
+        if !failures.isEmpty { alertMessage = failures.joined(separator: "\n") }
+    }
+
+    /// Remove from Brewfile. In mrk mode an entry whose package is not
+    /// installed is pruned by sync; any other is removed by Barkeep, and
+    /// the save that follows runs check-picker-desc --fix.
+    private func removeEntries(_ entries: [BrewfileEntry]) {
+        guard let url = appState.brewfilePath else { return }
+        guard mrk.isActive else {
+            brewfileVM.remove(entries: entries, brewfileURL: url)
+            return
+        }
+        let stale = entries.filter { mrk.candidate(.prune, name: $0.name, kind: $0.kind) != nil }
+        let staleIDs = Set(stale.map(\.id))
+        let rest = entries.filter { !staleIDs.contains($0.id) }
+        if !rest.isEmpty { brewfileVM.remove(entries: rest, brewfileURL: url) }
+        if !stale.isEmpty {
+            Task { await runMrk(stale.map { .prune(name: $0.name, kind: $0.kind) }) }
+        }
     }
 
     /// Shared streaming runner used for toolbar-level brew commands.

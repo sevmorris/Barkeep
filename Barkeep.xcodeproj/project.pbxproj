@@ -33,6 +33,11 @@
 		EB2358577C5272B402A43C1F /* BrewfileEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB6481A2E615EF61078E7A9D /* BrewfileEntry.swift */; };
 		F2069600C7982A1AD7D7084B /* BrewfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7438683DB48E09178234F9D8 /* BrewfileViewModel.swift */; };
 		F4C2F27C403B7AB90BDB5AF0 /* BrewfileParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A853DBC4A3DD73EF8283177D /* BrewfileParser.swift */; };
+		E5F8D40E8A3E0E90674CE423 /* ScriptProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA78A5071A62C61DBB916F84 /* ScriptProcess.swift */; };
+		EA4506AC362A50C86217DCE9 /* ShellEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3913484AFF88E74D0B3F753A /* ShellEnvironment.swift */; };
+		21C0BE54E76D95D7853C822A /* MrkRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9534DAFFEA645D29E266F003 /* MrkRunner.swift */; };
+		4B7AC1DB77A4A5B061739BF8 /* MrkModeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B906F453C4814168516AE9D9 /* MrkModeViewModel.swift */; };
+		08C89F731AB195CAE4DE659C /* MrkModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153B687DC7F98998089B505D /* MrkModeTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,6 +80,11 @@
 		DA483CBD6AB1F29CFF880E2F /* BarkeepTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BarkeepTests.swift; sourceTree = "<group>"; };
 		E05DF1B67A6A210B524DA8CF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F82D09D0DD9B0F504FFB30A0 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
+		EA78A5071A62C61DBB916F84 /* ScriptProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptProcess.swift; sourceTree = "<group>"; };
+		3913484AFF88E74D0B3F753A /* ShellEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellEnvironment.swift; sourceTree = "<group>"; };
+		9534DAFFEA645D29E266F003 /* MrkRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MrkRunner.swift; sourceTree = "<group>"; };
+		B906F453C4814168516AE9D9 /* MrkModeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MrkModeViewModel.swift; sourceTree = "<group>"; };
+		153B687DC7F98998089B505D /* MrkModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MrkModeTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -82,6 +92,7 @@
 			isa = PBXGroup;
 			children = (
 				DA483CBD6AB1F29CFF880E2F /* BarkeepTests.swift */,
+				153B687DC7F98998089B505D /* MrkModeTests.swift */,
 			);
 			path = BarkeepTests;
 			sourceTree = "<group>";
@@ -94,6 +105,9 @@
 				85BDDD39E42E960B6477CCE2 /* BrewRunner.swift */,
 				1515D8935F4133FF1B61B619 /* NotificationService.swift */,
 				830CF38139D96D05EA9DDD57 /* UpdateChecker.swift */,
+				9534DAFFEA645D29E266F003 /* MrkRunner.swift */,
+				3913484AFF88E74D0B3F753A /* ShellEnvironment.swift */,
+				EA78A5071A62C61DBB916F84 /* ScriptProcess.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -165,6 +179,7 @@
 			children = (
 				7438683DB48E09178234F9D8 /* BrewfileViewModel.swift */,
 				785D7B9CE182339A802885A4 /* UntrackedViewModel.swift */,
+				B906F453C4814168516AE9D9 /* MrkModeViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -282,6 +297,10 @@
 				5240236D547818EFE4C33927 /* RootContentView.swift in Sources */,
 				3B9474CD58AE6729752E4330 /* SectionNameSheet.swift in Sources */,
 				29203C0BDBE982577FC7204F /* UpdateChecker.swift in Sources */,
+				4B7AC1DB77A4A5B061739BF8 /* MrkModeViewModel.swift in Sources */,
+				21C0BE54E76D95D7853C822A /* MrkRunner.swift in Sources */,
+				EA4506AC362A50C86217DCE9 /* ShellEnvironment.swift in Sources */,
+				E5F8D40E8A3E0E90674CE423 /* ScriptProcess.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -290,6 +309,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7F747DD3D6F937D13DF5A9C6 /* BarkeepTests.swift in Sources */,
+				08C89F731AB195CAE4DE659C /* MrkModeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

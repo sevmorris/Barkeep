@@ -49,6 +49,12 @@ struct BrewPackage: Identifiable, Hashable {
     var isInBrewfile: Bool = false
     var brewfileSection: String? = nil
 
+    // mrk mode, from `sync --check --details`
+    /// The section sync files this cask under when it is added.
+    var mrkSection: String? = nil
+    /// Why sync files it there.
+    var mrkReason: String = ""
+
     static func == (lhs: BrewPackage, rhs: BrewPackage) -> Bool {
         lhs.name == rhs.name && lhs.kind == rhs.kind
     }
