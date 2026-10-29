@@ -214,14 +214,14 @@ private struct CheckLinesFixture: Decodable {
 private func scalars(_ s: some StringProtocol) -> [Unicode.Scalar] { Array(s.unicodeScalars) }
 
 @Suite("mrk's line contract")
-struct MrkLineTests {
+struct MrkTextTests {
 
     @Test("Each line of mrk's fixture gives back its fields")
     func fixtureFields() throws {
         let fixture = try CheckLinesFixture.load()
         #expect(!fixture.cases.isEmpty)
         for c in fixture.cases {
-            #expect(MrkLine.fields(Substring(c.line))?.map(scalars) == c.fields.map(scalars), "\(c.why)")
+            #expect(MrkText.fields(Substring(c.line))?.map(scalars) == c.fields.map(scalars), "\(c.why)")
         }
     }
 
@@ -229,7 +229,7 @@ struct MrkLineTests {
     func fixtureLines() throws {
         let fixture = try CheckLinesFixture.load()
         let output = fixture.cases.map { $0.line + "\n" }.joined()
-        #expect(MrkLine.lines(output).map(scalars) == fixture.cases.map { scalars($0.line) })
+        #expect(MrkText.lines(output).map(scalars) == fixture.cases.map { scalars($0.line) })
     }
 }
 
@@ -347,6 +347,33 @@ struct MrkRunnerTests {
                 == stub.root.resolvingSymlinksInPath().path)
         #expect(log.contains("mark from-the-test"))
         #expect(!log.contains("stdin tty") && !log.contains("stdin data"))
+    }
+
+    /// By the line contract a later sync only adds words and fields: lines,
+    /// and not one Barkeep reads, are a sync newer than Barkeep, and the
+    /// Untracked list must not show itself empty for them.
+    @Test("Lines and none of them read is an error that names an older Barkeep")
+    func checkUnreadable() async throws {
+        let stub = try StubCheckout(checkOutput: "adopt\tformula\tzq-tool\nadd\tkeg\tzq-other\n")
+        do {
+            _ = try await stub.runner().check(stub.checkout)
+            Issue.record("an output with no line Barkeep reads gave a list")
+        } catch let error as MrkError {
+            guard case .unreadable(let command) = error else {
+                Issue.record("expected .unreadable, got \(error)")
+                return
+            }
+            #expect(command.hasSuffix("sync --check --details"), "\(command)")
+            #expect(error.localizedDescription.contains("this Barkeep is older than mrk's output"))
+        }
+    }
+
+    @Test("No lines is nothing to do, and a line Barkeep reads beside one it does not is enough")
+    func checkEmptyAndPartlyRead() async throws {
+        let empty = try StubCheckout(checkOutput: "")
+        #expect(try await empty.runner().check(empty.checkout).isEmpty)
+        let mixed = try StubCheckout(checkOutput: "adopt\tformula\tzq-new-word\nadd\tformula\tzq-tool\n")
+        #expect(try await mixed.runner().check(mixed.checkout).map(\.name) == ["zq-tool"])
     }
 
     @Test("Each line reaches the console as it comes, stdout and stderr both")
