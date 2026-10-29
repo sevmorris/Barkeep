@@ -52,7 +52,9 @@ private final class StubCheckout {
                     echo "  ✓ Described 1 package(s)" >&2 ;;
           --ignore) if [ "$2" = taken ]; then echo "  ✗ taken is already in the Brewfile." >&2; exit 1; fi
                     echo "  ▸ Added $2 to ~/.mrk/sync-ignore" >&2 ;;
-          --prune)  if [ "$2" = slow ]; then sleep 10; fi ;;
+          --prune)  if [ "$2" = slow ]; then sleep 10; fi
+                    if [ "$2" = bad ]; then echo "  ✗ Not a package name: 'bad'." >&2
+                                            echo "    Run sync --help for the options." >&2; exit 2; fi ;;
         esac
         """
         let fix = "#!/bin/bash\n\(record)\necho 'check-picker-desc: OK'\n"
@@ -70,6 +72,14 @@ private final class StubCheckout {
     }
 
     var checkout: MrkCheckout { MrkCheckout(root: root) }
+
+    /// Gives the checkout a scripts/mrk-contract that records its run and
+    /// prints JSON.
+    func contract(_ json: String) throws {
+        try json.write(to: root.appendingPathComponent("contract.json"), atomically: true, encoding: .utf8)
+        try write("#!/bin/bash\necho 'run mrk-contract' >> \"\(calls.path)\"\ncat \"\(root.path)/contract.json\"\n",
+                  to: "scripts/mrk-contract", executable: true)
+    }
 
     func runner(timeout: Duration = .seconds(30)) -> MrkRunner {
         MrkRunner(environment: { ["PATH": "/usr/bin:/bin", "MRK_TEST_MARK": "from-the-test"] },
@@ -375,6 +385,107 @@ struct MrkRunnerTests {
         } catch let error as MrkError {
             guard case .timedOut = error else { Issue.record("wrong error: \(error)"); return }
         }
+    }
+}
+
+/// A contract with sync's and check-picker-desc's options, as given.
+private func contractJSON(version: Int = 1,
+                          sync: [String] = ["--check", "--details", "--add", "--section", "--ignore", "--prune", "--formula", "--cask"],
+                          fix: [String] = ["--fix"]) -> String {
+    func list(_ words: [String]) -> String { "[" + words.map { "\"\($0)\"" }.joined(separator: ", ") + "]" }
+    return """
+    {"contract": \(version), "about": "", "later": 1, "scripts": {
+      "scripts/sync": {"options": \(list(sync)), "equals": [], "decisions": [], "check": null},
+      "scripts/check-picker-desc": {"options": \(list(fix)), "equals": [], "decisions": [], "check": null}
+    }}
+    """
+}
+
+/// Every command Barkeep runs.
+private let everyCommand: [MrkCommand] = [
+    .check, .add(name: "a", kind: .formula, section: "Repo essentials"), .add(name: "a", kind: .cask, section: nil),
+    .ignore(name: "a", kind: .formula), .prune(name: "a", kind: .cask), .fixDescriptions,
+]
+
+@Suite("mrk-contract")
+struct MrkContractTests {
+
+    /// mrk's scripts/mrk-contract as BarkeepTests/Fixtures/mrk-contract.json
+    /// holds its output, from the mrk that added it.
+    @Test("The contract of the mrk Barkeep is built against takes every command it runs")
+    func realContract() throws {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/mrk-contract.json")
+        let contract = try MrkContract.decode(Data(contentsOf: url))
+        #expect(contract.contract == MrkContract.supportedVersion)
+        for command in everyCommand {
+            #expect(contract.missing(command) == [], "\(command)")
+        }
+    }
+
+    @Test("An option the contract lacks is refused before sync runs, and the contract is read once")
+    func olderMrk() async throws {
+        let stub = try StubCheckout(checkOutput: checkOutput)
+        try stub.contract(contractJSON(sync: ["--check", "--add", "--ignore", "--prune", "--formula", "--cask"]))
+        let runner = stub.runner()
+        do {
+            _ = try await runner.check(stub.checkout)
+            Issue.record("the refusal did not throw")
+        } catch let error as MrkError {
+            guard case .notTaken = error else { Issue.record("wrong error: \(error)"); return }
+            #expect(error.localizedDescription
+                    == "scripts/sync does not take --details: this mrk is older than Barkeep. Run make pull in \(stub.root.path).")
+        }
+        try await runner.run(.ignore(name: "zq", kind: .cask), in: stub.checkout)
+        #expect(stub.runs() == ["run mrk-contract", "run sync --ignore zq --cask"])
+    }
+
+    @Test("A newer contract that lacks an option says this Barkeep is older")
+    func olderBarkeep() async throws {
+        let stub = try StubCheckout()
+        try stub.contract(contractJSON(version: 2, fix: []))
+        do {
+            try await stub.runner().run(.fixDescriptions, in: stub.checkout)
+            Issue.record("the refusal did not throw")
+        } catch let error as MrkError {
+            #expect(error.localizedDescription.hasPrefix("scripts/check-picker-desc does not take --fix: this Barkeep is older than mrk."))
+        }
+        #expect(stub.runs() == ["run mrk-contract"])
+    }
+
+    @Test("With the contract, an exit 2 shows the line sync marked ✗, not the hint after it")
+    func exitTwoIsTheReason() async throws {
+        let stub = try StubCheckout()
+        try stub.contract(contractJSON())
+        do {
+            try await stub.runner().run(.prune(name: "bad", kind: .cask), in: stub.checkout)
+            Issue.record("the refusal did not throw")
+        } catch let error as MrkError {
+            #expect(error.localizedDescription == "Not a package name: 'bad'.")
+        }
+    }
+
+    @Test("make pull changes scripts/mrk-contract, and the next run reads it again")
+    func readAgain() async throws {
+        let stub = try StubCheckout(checkOutput: checkOutput)
+        try stub.contract(contractJSON(sync: ["--check"]))
+        let runner = stub.runner()
+        await #expect(throws: MrkError.self) { _ = try await runner.check(stub.checkout) }
+        try stub.contract(contractJSON())
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(60)],
+                                              ofItemAtPath: stub.root.appendingPathComponent("scripts/mrk-contract").path)
+        #expect(try await runner.check(stub.checkout).count == 3)
+        #expect(stub.runs() == ["run mrk-contract", "run mrk-contract", "run sync --check --details"])
+    }
+
+    @Test("Each option a command gives is one of its arguments, and no value is taken for one")
+    func options() {
+        #expect(MrkCommand.add(name: "a", kind: .formula, section: "Repo essentials").options
+                == ["--add", "--formula", "--section"])
+        #expect(MrkCommand.check.options == ["--check", "--details"])
+        #expect(MrkCommand.fixDescriptions.options == ["--fix"])
+        #expect(MrkCommand.fixDescriptions.script == "scripts/check-picker-desc")
+        #expect(MrkCommand.check.script == "scripts/sync")
     }
 }
 
