@@ -8,6 +8,11 @@ import SwiftUI
 /// Brewfile, `isWritingBrewfile` is set and BrewfileViewModel holds its own
 /// writes back, because a save from Barkeep's copy of the file made before
 /// sync ran would put back what sync just changed.
+/// The keys of mrk mode's settings, in the app's defaults.
+enum MrkSettings {
+    static let pushBrewfileChanges = "pushBrewfileChanges"
+}
+
 @Observable
 @MainActor
 final class MrkMode {
@@ -29,11 +34,21 @@ final class MrkMode {
     var prunes: [MrkCandidate] { candidates.filter { $0.action == .prune } }
 
     private let runner: MrkRunner
+    private let defaults: UserDefaults
     private var tail: Task<Void, Never>?
     private var fixQueued = false
 
-    init(runner: MrkRunner = MrkRunner()) {
+    init(runner: MrkRunner = MrkRunner(), defaults: UserDefaults = .app) {
         self.runner = runner
+        self.defaults = defaults
+    }
+
+    /// Commit and Push Brewfile Changes, in the File menu: on until it is
+    /// turned off. With it, an add and a prune pass --push to sync, when the
+    /// checkout's sync takes it, so the change reaches GitHub without
+    /// mrk-push. Barkeep's other edits are not committed.
+    var pushesBrewfileChanges: Bool {
+        defaults.object(forKey: MrkSettings.pushBrewfileChanges) as? Bool ?? true
     }
 
     /// Turns mrk mode on for a Brewfile in an mrk checkout, and off for any
@@ -134,7 +149,9 @@ final class MrkMode {
             isBusy = false
             isWritingBrewfile = false
         }
-        log.append(command.displayLine(in: checkout))
+        let push = command.canPush && pushesBrewfileChanges
+            ? await runner.takesPush(in: checkout) : false
+        log.append(command.displayLine(in: checkout, push: push))
 
         // The lines arrive on the pipes' threads. A stream keeps them in the
         // order they came, and is drained before the outcome is logged.
@@ -149,7 +166,7 @@ final class MrkMode {
         }
         var failure: Error?
         do {
-            try await runner.run(command, in: checkout) { line, fromStderr in
+            try await runner.run(command, in: checkout, push: push) { line, fromStderr in
                 sink.yield((line, fromStderr))
             }
         } catch {

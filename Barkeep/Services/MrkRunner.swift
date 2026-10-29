@@ -124,11 +124,17 @@ struct MrkContract: Decodable, Equatable, Sendable {
     /// Whether this mrk is newer than the contract this build reads.
     var isNewer: Bool { contract > Self.supportedVersion }
 
-    /// The options of COMMAND that its script does not take. Empty when it
-    /// takes them all, and nil when the contract does not name the script.
-    func missing(_ command: MrkCommand) -> [String]? {
+    /// The options of COMMAND, with --push when PUSH is set, that its script
+    /// does not take. Empty when it takes them all, and nil when the contract
+    /// does not name the script.
+    func missing(_ command: MrkCommand, push: Bool = false) -> [String]? {
         guard let script = scripts[command.script] else { return nil }
-        return command.options.filter { !script.options.contains($0) }
+        return command.options(push: push).filter { !script.options.contains($0) }
+    }
+
+    /// Whether SCRIPT, by its path in the checkout, takes OPTION.
+    func takes(_ option: String, in script: String) -> Bool {
+        scripts[script]?.options.contains(option) ?? false
     }
 }
 
@@ -163,9 +169,22 @@ enum MrkCommand: Equatable, Sendable {
         self == .fixDescriptions ? "scripts/check-picker-desc" : "scripts/sync"
     }
 
+    /// Whether sync can commit and push what the command changes: an add or
+    /// a prune, which rewrite the Brewfile and the description table.
+    var canPush: Bool { writesBrewfile }
+
     /// The options the command gives, by name, as mrk-contract lists them.
-    var options: [String] {
-        arguments.filter { $0.hasPrefix("-") }
+    var options: [String] { options(push: false) }
+
+    func options(push: Bool) -> [String] {
+        arguments(push: push).filter { $0.hasPrefix("-") }
+    }
+
+    /// The arguments, and --push last when PUSH is set and the command can
+    /// push: sync then commits the Brewfile and the table, and pushes that
+    /// commit when it is the one commit origin lacks (mrk's BIN-1, sync).
+    func arguments(push: Bool) -> [String] {
+        arguments + (push && canPush ? ["--push"] : [])
     }
 
     /// The arguments, with the kind always given, so a name that is both a
@@ -188,8 +207,8 @@ enum MrkCommand: Equatable, Sendable {
     }
 
     /// The command as the console shows it.
-    func displayLine(in checkout: MrkCheckout) -> String {
-        let args = arguments.map { $0.contains(" ") ? "\"\($0)\"" : $0 }
+    func displayLine(in checkout: MrkCheckout, push: Bool = false) -> String {
+        let args = arguments(push: push).map { $0.contains(" ") ? "\"\($0)\"" : $0 }
         return "$ " + ([script] + args).joined(separator: " ")
     }
 
@@ -270,19 +289,27 @@ actor MrkRunner {
         return contract
     }
 
-    /// Runs the command in the checkout, handing each line of its output to
-    /// `onLine` as it arrives. Throws when the script exits non-zero, with
-    /// the reason it wrote to stderr: the last line it marked ✗, or else its
-    /// last line. Throws without running it when the checkout's mrk-contract
-    /// does not list one of its options.
+    /// Whether the checkout's sync takes --push, by its mrk-contract. An mrk
+    /// with no contract, or one from before --push, does not.
+    func takesPush(in checkout: MrkCheckout) async -> Bool {
+        await contract(for: checkout)?.takes("--push", in: "scripts/sync") ?? false
+    }
+
+    /// Runs the command in the checkout, with --push when PUSH is set and the
+    /// command can push, handing each line of its output to `onLine` as it
+    /// arrives. Throws when the script exits non-zero, with the reason it
+    /// wrote to stderr: the last line it marked ✗, or else its last line.
+    /// Throws without running it when the checkout's mrk-contract does not
+    /// list one of its options.
     @discardableResult
     func run(
         _ command: MrkCommand,
         in checkout: MrkCheckout,
+        push: Bool = false,
         onLine: @escaping @Sendable (String, _ fromStderr: Bool) -> Void = { _, _ in }
     ) async throws -> ScriptResult {
-        let name = String(command.displayLine(in: checkout).dropFirst(2))
-        if let contract = await contract(for: checkout), let missing = contract.missing(command), !missing.isEmpty {
+        let name = String(command.displayLine(in: checkout, push: push).dropFirst(2))
+        if let contract = await contract(for: checkout), let missing = contract.missing(command, push: push), !missing.isEmpty {
             let options = missing.joined(separator: " ")
             throw MrkError.notTaken(command: name, message: contract.isNewer
                 ? "\(command.script) does not take \(options): this Barkeep is older than mrk. Choose Check for Updates… in the Barkeep menu."
@@ -291,7 +318,7 @@ actor MrkRunner {
         let env = await resolvedEnvironment()
         let result = try await ScriptProcess.run(
             command.executable(in: checkout),
-            arguments: command.arguments,
+            arguments: command.arguments(push: push),
             environment: env,
             currentDirectory: checkout.root,
             timeout: timeout,

@@ -447,7 +447,9 @@ struct MrkContractTests {
         #expect(contract.contract == MrkContract.supportedVersion)
         for command in everyCommand {
             #expect(contract.missing(command) == [], "\(command)")
+            #expect(contract.missing(command, push: true) == [], "\(command) --push")
         }
+        #expect(contract.takes("--push", in: "scripts/sync"))
     }
 
     @Test("An option the contract lacks is refused before sync runs, and the contract is read once")
@@ -503,6 +505,29 @@ struct MrkContractTests {
                                               ofItemAtPath: stub.root.appendingPathComponent("scripts/mrk-contract").path)
         #expect(try await runner.check(stub.checkout).count == 3)
         #expect(stub.runs() == ["run mrk-contract", "run mrk-contract", "run sync --check --details"])
+    }
+
+    @Test("--push goes last on an add and a prune, and on nothing else")
+    func pushArguments() {
+        #expect(MrkCommand.add(name: "a", kind: .cask, section: nil).arguments(push: true)
+                == ["--add", "a", "--cask", "--push"])
+        #expect(MrkCommand.prune(name: "a", kind: .formula).arguments(push: true)
+                == ["--prune", "a", "--formula", "--push"])
+        for command in [MrkCommand.check, .ignore(name: "a", kind: .cask), .fixDescriptions] {
+            #expect(command.arguments(push: true) == command.arguments, "\(command)")
+        }
+        #expect(MrkCommand.prune(name: "a", kind: .formula).displayLine(in: MrkCheckout(root: URL(fileURLWithPath: "/m")), push: true)
+                == "$ scripts/sync --prune a --formula --push")
+    }
+
+    @Test("A contract that lacks --push refuses it, and one that lists it takes it")
+    func pushInContract() throws {
+        let older = try MrkContract.decode(Data(contractJSON().utf8))
+        #expect(!older.takes("--push", in: "scripts/sync"))
+        #expect(older.missing(.prune(name: "a", kind: .cask), push: true) == ["--push"])
+        let newer = try MrkContract.decode(Data(contractJSON(sync: ["--prune", "--cask", "--push"]).utf8))
+        #expect(newer.takes("--push", in: "scripts/sync"))
+        #expect(newer.missing(.prune(name: "a", kind: .cask), push: true) == [])
     }
 
     @Test("Each option a command gives is one of its arguments, and no value is taken for one")
@@ -570,10 +595,56 @@ private final class LockedLines: @unchecked Sendable {
 @MainActor
 struct MrkModeTests {
 
-    private func mode(_ stub: StubCheckout) -> MrkMode {
-        let mrk = MrkMode(runner: stub.runner())
+    private func mode(_ stub: StubCheckout, defaults: UserDefaults? = nil) -> MrkMode {
+        let mrk = MrkMode(runner: stub.runner(), defaults: defaults ?? scratchDefaults())
         mrk.open(brewfile: stub.brewfile)
         return mrk
+    }
+
+    /// A defaults suite of the test's own, in the temporary folder, empty.
+    private func scratchDefaults() -> UserDefaults {
+        let name = FileManager.default.temporaryDirectory
+            .appendingPathComponent("barkeep-mrk-defaults-\(UUID().uuidString)").path
+        let defaults = UserDefaults(suiteName: name)!
+        defaults.removePersistentDomain(forName: name)
+        return defaults
+    }
+
+    @Test("With the setting on, as it is at first, an add and a prune pass --push when sync takes it")
+    func pushWhenTaken() async throws {
+        let stub = try StubCheckout(checkOutput: checkOutput)
+        try stub.contract(contractJSON(sync: ["--check", "--details", "--add", "--section", "--ignore", "--prune",
+                                              "--formula", "--cask", "--push"]))
+        let mrk = mode(stub)
+        #expect(mrk.pushesBrewfileChanges)
+        let log = ProcessingLog()
+        #expect(await mrk.perform(.prune(name: "zq-gone", kind: .cask), log: log) == nil)
+        #expect(await mrk.perform(.ignore(name: "zq-tool", kind: .formula), log: log) == nil)
+        #expect(log.entries.map(\.message).contains("$ scripts/sync --prune zq-gone --cask --push"))
+        #expect(stub.runs().filter { $0.hasPrefix("run sync --prune") || $0.hasPrefix("run sync --ignore") }
+                == ["run sync --prune zq-gone --cask --push", "run sync --ignore zq-tool --formula"])
+    }
+
+    @Test("With the setting off, or a sync that does not take --push, an add runs as before")
+    func noPush() async throws {
+        let stub = try StubCheckout(checkOutput: checkOutput)
+        try stub.contract(contractJSON(sync: ["--check", "--details", "--add", "--section", "--ignore", "--prune",
+                                              "--formula", "--cask", "--push"]))
+        let off = scratchDefaults()
+        off.set(false, forKey: MrkSettings.pushBrewfileChanges)
+        let log = ProcessingLog()
+        #expect(await mode(stub, defaults: off).perform(.add(name: "zq-chess", kind: .cask, section: nil), log: log) == nil)
+
+        let older = try StubCheckout(checkOutput: checkOutput)
+        try older.contract(contractJSON())
+        #expect(await mode(older).perform(.add(name: "zq-chess", kind: .cask, section: nil), log: log) == nil)
+
+        let none = try StubCheckout(checkOutput: checkOutput)
+        #expect(await mode(none).perform(.add(name: "zq-chess", kind: .cask, section: nil), log: log) == nil)
+
+        for checkout in [stub, older, none] {
+            #expect(checkout.runs().contains("run sync --add zq-chess --cask"), "\(checkout.runs())")
+        }
     }
 
     @Test("On for a Brewfile in an mrk checkout, off for any other")
