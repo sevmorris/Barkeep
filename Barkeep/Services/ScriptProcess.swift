@@ -165,3 +165,20 @@ final class LineCollector: @unchecked Sendable {
         if !tail.isEmpty { onLine(String(decoding: tail, as: UTF8.self)) }
     }
 }
+
+extension ShellEnvironment {
+    /// Asks an interactive login zsh for its environment, with ScriptProcess,
+    /// or returns nil when it fails, hangs past `timeout`, or prints no
+    /// markers. ScriptProcess gives it /dev/null for stdin.
+    static func capture(
+        shell: URL = URL(fileURLWithPath: "/bin/zsh"),
+        timeout: Duration = .seconds(15)
+    ) async -> [String: String]? {
+        guard let result = try? await ScriptProcess.run(
+            shell,
+            arguments: ["-i", "-l", "-c", script],
+            timeout: timeout
+        ), !result.timedOut else { return nil }
+        return parse(result.stdout)
+    }
+}

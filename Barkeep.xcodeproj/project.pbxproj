@@ -35,6 +35,7 @@
 		F4C2F27C403B7AB90BDB5AF0 /* BrewfileParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A853DBC4A3DD73EF8283177D /* BrewfileParser.swift */; };
 		E5F8D40E8A3E0E90674CE423 /* ScriptProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA78A5071A62C61DBB916F84 /* ScriptProcess.swift */; };
 		EA4506AC362A50C86217DCE9 /* ShellEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3913484AFF88E74D0B3F753A /* ShellEnvironment.swift */; };
+		1F936BC5A04647FCCFF396BF /* MrkText.swift in Sources */ = {isa = PBXBuildFile; fileRef = C991CA2D153152BD7F36AC97 /* MrkText.swift */; };
 		21C0BE54E76D95D7853C822A /* MrkRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9534DAFFEA645D29E266F003 /* MrkRunner.swift */; };
 		4B7AC1DB77A4A5B061739BF8 /* MrkModeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B906F453C4814168516AE9D9 /* MrkModeViewModel.swift */; };
 		08C89F731AB195CAE4DE659C /* MrkModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153B687DC7F98998089B505D /* MrkModeTests.swift */; };
@@ -82,6 +83,7 @@
 		F82D09D0DD9B0F504FFB30A0 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
 		EA78A5071A62C61DBB916F84 /* ScriptProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptProcess.swift; sourceTree = "<group>"; };
 		3913484AFF88E74D0B3F753A /* ShellEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShellEnvironment.swift; sourceTree = "<group>"; };
+		C991CA2D153152BD7F36AC97 /* MrkText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MrkText.swift; sourceTree = "<group>"; };
 		9534DAFFEA645D29E266F003 /* MrkRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MrkRunner.swift; sourceTree = "<group>"; };
 		B906F453C4814168516AE9D9 /* MrkModeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MrkModeViewModel.swift; sourceTree = "<group>"; };
 		153B687DC7F98998089B505D /* MrkModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MrkModeTests.swift; sourceTree = "<group>"; };
@@ -107,6 +109,7 @@
 				830CF38139D96D05EA9DDD57 /* UpdateChecker.swift */,
 				9534DAFFEA645D29E266F003 /* MrkRunner.swift */,
 				3913484AFF88E74D0B3F753A /* ShellEnvironment.swift */,
+				C991CA2D153152BD7F36AC97 /* MrkText.swift */,
 				EA78A5071A62C61DBB916F84 /* ScriptProcess.swift */,
 			);
 			path = Services;
@@ -300,6 +303,7 @@
 				4B7AC1DB77A4A5B061739BF8 /* MrkModeViewModel.swift in Sources */,
 				21C0BE54E76D95D7853C822A /* MrkRunner.swift in Sources */,
 				EA4506AC362A50C86217DCE9 /* ShellEnvironment.swift in Sources */,
+				1F936BC5A04647FCCFF396BF /* MrkText.swift in Sources */,
 				E5F8D40E8A3E0E90674CE423 /* ScriptProcess.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
