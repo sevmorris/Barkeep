@@ -67,6 +67,21 @@ struct RootContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .barkeepRefresh)) { _ in
             if let url = appState.brewfilePath { brewfileVM.load(from: url) }
         }
+        // barkeep://untracked, from Dipstick's fix for a package the Brewfile
+        // lacks: show the Untracked list, read again.
+        .handlesExternalEvents(preferring: [BarkeepLink.untrackedHost], allowing: [BarkeepLink.untrackedHost])
+        .onOpenURL { url in
+            guard BarkeepLink.showsUntracked(url) else { return }
+            if sidebarTab == .untracked {
+                if mrk.isActive {
+                    Task { await mrk.refresh() }
+                } else {
+                    Task { await untrackedVM.load(brewfileEntries: brewfileVM.allEntries) }
+                }
+            } else {
+                sidebarTab = .untracked
+            }
+        }
         .onChange(of: sidebarTab) { _, tab in
             guard tab == .untracked else { return }
             if mrk.isActive {

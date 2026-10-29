@@ -68,6 +68,9 @@ struct BarkeepApp: App {
                     await checkForUpdates(silent: true, appState: appState)
                 }
         }
+        // A barkeep://untracked link makes a window only when none is open:
+        // an open one claims the link (RootContentView).
+        .handlesExternalEvents(matching: [BarkeepLink.untrackedHost])
         .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing: .help) {
@@ -107,6 +110,7 @@ struct BarkeepApp: App {
         Window("Help", id: "help") {
             HelpView()
         }
+        .handlesExternalEvents(matching: [])
         .windowResizability(.contentSize)
     }
 }

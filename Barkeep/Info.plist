@@ -16,6 +16,17 @@
 	<string>Barkeep</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>io.github.sevmorris.Barkeep</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>barkeep</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleShortVersionString</key>
 	<string>1.16.1</string>
 	<key>CFBundleVersion</key>
