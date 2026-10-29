@@ -56,6 +56,7 @@ extension UserDefaults {
 
 struct BarkeepApp: App {
     @State private var appState = AppState()
+    @AppStorage(MrkSettings.pushBrewfileChanges, store: .app) private var pushBrewfileChanges = true
     @Environment(\.openWindow) private var openWindow
 
     var body: some Scene {
@@ -92,6 +93,12 @@ struct BarkeepApp: App {
                     NotificationCenter.default.post(name: .barkeepRefresh, object: nil)
                 }
                 .keyboardShortcut("R", modifiers: .command)
+
+                Divider()
+
+                // mrk mode: an add or a prune runs sync --push, which commits
+                // the Brewfile and the table and pushes that commit.
+                Toggle("Commit and Push Brewfile Changes", isOn: $pushBrewfileChanges)
             }
 
 

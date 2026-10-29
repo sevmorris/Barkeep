@@ -47,7 +47,8 @@ struct HelpView: View {
                     definition("Ignore",               as: "sync adds the name to ~/.mrk/sync-ignore, so it is not offered again")
                     definition("Remove from Brewfile", as: "For a package that is not installed, sync prunes the entry and its description")
                     definition("Other edits",          as: "Barkeep runs check-picker-desc --fix afterwards, so no description is missing")
-                    text("Barkeep does not commit. Commit ~/mrk with mrk-push or pushall.")
+                    definition("Commit and Push Brewfile Changes", as: "In the File menu, on at first. An add or a prune runs sync --push, which commits the Brewfile and the description table and pushes that commit to GitHub. When sync keeps the commit, the console says why; push it with mrk-push")
+                    text("Barkeep does not commit its other edits. Commit them with mrk-push or pushall.")
                 }
 
                 section("Console") {
