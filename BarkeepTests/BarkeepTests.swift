@@ -530,3 +530,31 @@ struct UpdateCheckerMinimumMacOSTests {
         #expect(UpdateChecker.describe(version(15, 2, 1)) == "15.2.1")
     }
 }
+
+// MARK: - Links
+
+@Suite("barkeep:// links")
+struct BarkeepLinkTests {
+
+    @Test("barkeep://untracked shows the Untracked list, in any case")
+    func untracked() throws {
+        #expect(BarkeepLink.showsUntracked(try #require(URL(string: "barkeep://untracked"))))
+        #expect(BarkeepLink.showsUntracked(try #require(URL(string: "Barkeep://Untracked"))))
+    }
+
+    @Test("Another host or scheme is not the link")
+    func others() throws {
+        for link in ["barkeep://brewfile", "barkeep:untracked", "https://untracked", "dipstick://untracked"] {
+            #expect(!BarkeepLink.showsUntracked(try #require(URL(string: link))), "\(link)")
+        }
+    }
+
+    @Test("The built app declares the barkeep scheme")
+    func declared() throws {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Barkeep/Info.plist")
+        let plist = try #require(NSDictionary(contentsOf: url))
+        let types = try #require(plist["CFBundleURLTypes"] as? [[String: Any]])
+        #expect(types.flatMap { $0["CFBundleURLSchemes"] as? [String] ?? [] } == [BarkeepLink.scheme])
+    }
+}

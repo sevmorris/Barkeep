@@ -76,3 +76,19 @@ final class AppState {
         }
     }
 }
+
+/// The links Barkeep opens. `barkeep://untracked` shows the Untracked list:
+/// Dipstick's fix for a package that the Brewfile lacks opens it there, in
+/// place of sync's full-screen picker in a terminal. An open window takes the
+/// link; with none open, the window group makes one for it.
+enum BarkeepLink {
+    static let scheme = "barkeep"
+
+    /// What the window group and the window match a link against.
+    static let untrackedHost = "untracked"
+
+    /// Whether URL is the link to the Untracked list.
+    static func showsUntracked(_ url: URL) -> Bool {
+        url.scheme?.lowercased() == scheme && url.host()?.lowercased() == untrackedHost
+    }
+}
