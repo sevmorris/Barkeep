@@ -173,8 +173,7 @@ struct RootContentView: View {
         if mrk.isActive {
             ToolbarItem(placement: .automatic) {
                 Label("mrk", systemImage: "checkmark.seal")
-                    .labelStyle(.titleAndIcon)
-                    .foregroundStyle(.secondary)
+                    .toolbarBadge()
                     .help("mrk mode: this Brewfile is in an mrk checkout, so mrk's sync decides what is untracked, and adds, ignores and prunes packages.")
             }
         }
@@ -202,8 +201,7 @@ struct RootContentView: View {
         if untrackedVM.untrackedCount > 0 {
             ToolbarItem(placement: .automatic) {
                 Label("\(untrackedVM.untrackedCount) untracked", systemImage: "questionmark.circle.fill")
-                    .labelStyle(.titleAndIcon)
-                    .foregroundStyle(.secondary)
+                    .toolbarBadge()
                     .help("Untracked packages")
             }
         }
@@ -421,5 +419,17 @@ struct RootContentView: View {
             alertMessage = error.localizedDescription
         }
         isRunning = false
+    }
+}
+
+private extension Label {
+    /// A label in the toolbar that is not a button, such as the mrk badge.
+    /// A button brings its own inset; a label has none, so on macOS 26 its
+    /// icon touched the edge of the glass that groups the toolbar's items.
+    /// The padding is the inset a toolbar button has.
+    func toolbarBadge() -> some View {
+        labelStyle(.titleAndIcon)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
     }
 }
