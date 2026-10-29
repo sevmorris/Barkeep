@@ -27,7 +27,7 @@ When the open Brewfile is in an mrk checkout (`scripts/sync`, `scripts/check-pic
 - After any other edit Barkeep makes to the Brewfile, it runs `check-picker-desc --fix`, so no description is missing or left behind.
 - Barkeep does not commit. Commit `~/mrk` with `mrk-push` or `pushall`.
 
-Barkeep runs the scripts with the environment of an interactive login zsh, as a new Terminal window has, and shows their output in the console. The mrk toolbar badge shows the mode is on. Any other Brewfile works as before.
+Barkeep runs the scripts with the environment of an interactive login zsh, as a new Terminal window has, and shows their output in the console. It reads each line of `sync --check` by mrk's line contract: it splits the output only at a newline and each line only at a tab, and undoes the `\t`, `\n` and `\\` escapes in each field. The mrk toolbar badge shows the mode is on. Any other Brewfile works as before.
 
 ## Requirements
 
