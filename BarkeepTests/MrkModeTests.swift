@@ -165,8 +165,61 @@ struct MrkCandidateParseTests {
 
     @Test("Skips a line it cannot read")
     func malformed() {
-        let text = "add\tcask\nremove\tcask\tx\nadd\ttap\tx\nadd\tcask\t\nnot a line\nadd\tcask\tok\n"
+        let text = "add\tcask\nremove\tcask\tx\nadd\ttap\tx\nadd\tcask\t\nnot a line\nadd\tcask\tbad\\x\nadd\tcask\tok\n"
         #expect(MrkCandidate.parse(text).map(\.name) == ["ok"])
+    }
+
+    @Test("Undoes the escapes, and a description that ends in a carriage return does not take the next line")
+    func escapesAndCarriageReturn() {
+        let text = "add\tcask\tzq-a\tSec\\\\tion\tWhy\\tnot\tC:\\\\temp\\nnext\r\nprune\tformula\tzq-b\n"
+        let all = MrkCandidate.parse(text)
+        #expect(all.map(\.name) == ["zq-a", "zq-b"])
+        #expect(all.first?.section == "Sec\\tion")
+        #expect(all.first?.reason == "Why\tnot")
+        #expect(all.first?.description == "C:\\temp\nnext\r")
+    }
+}
+
+/// mrk's tests/fixtures/check-lines.json, as BarkeepTests/Fixtures copies it:
+/// for each case, the fields and the line mrk_check_line writes for them.
+/// mrk's own tests compare the copy with mrk's file, byte for byte, when
+/// Barkeep is checked out beside it.
+private struct CheckLinesFixture: Decodable {
+    struct Case: Decodable {
+        let why: String
+        let fields: [String]
+        let line: String
+    }
+    let cases: [Case]
+
+    static func load() throws -> CheckLinesFixture {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/check-lines.json")
+        return try JSONDecoder().decode(CheckLinesFixture.self, from: Data(contentsOf: url))
+    }
+}
+
+/// Swift's == on String takes a composed and a decomposed accent as equal, so
+/// the tests compare scalars, as mrk wrote them.
+private func scalars(_ s: some StringProtocol) -> [Unicode.Scalar] { Array(s.unicodeScalars) }
+
+@Suite("mrk's line contract")
+struct MrkLineTests {
+
+    @Test("Each line of mrk's fixture gives back its fields")
+    func fixtureFields() throws {
+        let fixture = try CheckLinesFixture.load()
+        #expect(!fixture.cases.isEmpty)
+        for c in fixture.cases {
+            #expect(MrkLine.fields(Substring(c.line))?.map(scalars) == c.fields.map(scalars), "\(c.why)")
+        }
+    }
+
+    @Test("The fixture's lines, printed as one output, split back into the same lines")
+    func fixtureLines() throws {
+        let fixture = try CheckLinesFixture.load()
+        let output = fixture.cases.map { $0.line + "\n" }.joined()
+        #expect(MrkLine.lines(output).map(scalars) == fixture.cases.map { scalars($0.line) })
     }
 }
 

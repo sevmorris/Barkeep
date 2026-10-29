@@ -48,6 +48,52 @@ struct MrkCheckout: Equatable, Sendable {
     }
 }
 
+/// The line contract of mrk's `--check` modes, as BIN-1 documents it: mrk's
+/// `mrk_check_line` puts one tab between two fields and escapes each field,
+/// a tab as `\t`, a newline as `\n` and a backslash as `\\`. mrk keeps the
+/// contract as data in tests/fixtures/check-lines.json, and
+/// BarkeepTests/Fixtures holds a copy that the tests read.
+///
+/// Both functions work by Unicode scalar, not by Character. As Characters, a
+/// carriage return and the newline after it are one, and so are an escape and
+/// a combining mark after it. mrk does not escape a carriage return, so in
+/// Barkeep 1.15 a description that ended in one joined two lines, and every
+/// escape showed as it came (sevmorris/mrk audit 22, Z-4).
+enum MrkLine {
+    /// The lines of an output: split at every newline, with no empty line.
+    static func lines(_ output: String) -> [Substring] {
+        output.unicodeScalars.split(separator: "\n").map(Substring.init)
+    }
+
+    /// The fields of one line, split at every tab, each with its escapes
+    /// undone. Two tabs in a row are an empty field. nil when a field has a
+    /// backslash before anything but t, n or another backslash, which mrk
+    /// never writes.
+    static func fields(_ line: Substring) -> [String]? {
+        var fields: [String] = []
+        for field in line.unicodeScalars.split(separator: "\t", omittingEmptySubsequences: false) {
+            guard let text = unescape(field) else { return nil }
+            fields.append(text)
+        }
+        return fields
+    }
+
+    private static func unescape(_ field: Substring.UnicodeScalarView.SubSequence) -> String? {
+        var out = String.UnicodeScalarView()
+        var it = field.makeIterator()
+        while let c = it.next() {
+            guard c == "\\" else { out.append(c); continue }
+            switch it.next() {
+            case "t": out.append("\t")
+            case "n": out.append("\n")
+            case "\\": out.append("\\")
+            default: return nil
+            }
+        }
+        return String(out)
+    }
+}
+
 /// One line of `sync --check --details`: a package sync would offer to add,
 /// or a Brewfile entry it would offer to prune.
 struct MrkCandidate: Identifiable, Hashable, Sendable {
@@ -68,13 +114,14 @@ struct MrkCandidate: Identifiable, Hashable, Sendable {
     var id: String { "\(action.rawValue):\(kind.rawValue):\(name)" }
 
     /// Parses the output of `sync --check` with or without `--details`: tab
-    /// separated, three fields, then section, reason and description. A line
-    /// that is not one of these is skipped, and a field added after the six
-    /// is ignored, so a later sync can add one without breaking this.
+    /// separated, three fields, then section, reason and description, each
+    /// field escaped as `MrkLine` undoes. A line that is not one of these is
+    /// skipped, and a field added after the six is ignored, so a later sync
+    /// can add one without breaking this.
     static func parse(_ output: String) -> [MrkCandidate] {
-        output.split(separator: "\n", omittingEmptySubsequences: true).compactMap { line in
-            let fields = line.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
-            guard fields.count >= 3,
+        MrkLine.lines(output).compactMap { line in
+            guard let fields = MrkLine.fields(line),
+                  fields.count >= 3,
                   let action = Action(rawValue: fields[0]),
                   !fields[2].isEmpty
             else { return nil }
