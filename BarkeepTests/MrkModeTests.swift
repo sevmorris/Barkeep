@@ -519,16 +519,26 @@ struct MrkContractTests {
 @Suite("Script process")
 struct ScriptProcessTests {
 
+    /// The child names itself on stderr and holds the pipes for a minute.
+    /// That run returns while the child is still alive is the proof: had it
+    /// waited for the pipes to close, the child would be gone. A deadline
+    /// alone could not tell a slow runner from a wait. On 2026-10-29 a
+    /// macos-15 runner with 22 jobs queued took 8.9 s over a 1-second grace,
+    /// past the 6 s this test then allowed (Barkeep#19). The bound below
+    /// is half the child's minute, so it still fails a grace grown that long.
     @Test("A child left holding the pipes does not keep Barkeep waiting")
     func orphanHoldsPipes() async throws {
         let started = ContinuousClock.now
         let result = try await ScriptProcess.run(
             URL(fileURLWithPath: "/bin/sh"),
-            arguments: ["-c", "sleep 10 & echo partial; exit 3"],
-            timeout: .seconds(30),
-            drainGrace: .seconds(1))
-        // The grace, not the ten seconds the child holds the pipes for.
-        #expect(ContinuousClock.now - started < .seconds(6))
+            arguments: ["-c", "sleep 60 & echo $! >&2; echo partial; exit 3"],
+            timeout: .seconds(120),
+            drainGrace: .seconds(2))
+        let elapsed = ContinuousClock.now - started
+        let child = try #require(Int32(result.stderrText.trimmingCharacters(in: .whitespacesAndNewlines)))
+        defer { kill(child, SIGKILL) }
+        #expect(kill(child, 0) == 0, "the child holding the pipes had already gone, so run waited for it")
+        #expect(elapsed < .seconds(30))
         #expect(result.status == 3)
         #expect(!result.timedOut)
         #expect(result.stdoutText == "partial\n")
