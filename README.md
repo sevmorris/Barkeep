@@ -29,6 +29,8 @@ When the open Brewfile is in an mrk checkout (`scripts/sync`, `scripts/check-pic
 
 Barkeep runs the scripts with the environment of an interactive login zsh, as a new Terminal window has, and shows their output in the console. It reads each line of `sync --check` by mrk's line contract: it splits the output only at a newline and each line only at a tab, and undoes the `\t`, `\n` and `\\` escapes in each field. The mrk toolbar badge shows the mode is on. Any other Brewfile works as before.
 
+Before it runs `sync` or `check-picker-desc`, Barkeep reads the checkout's `scripts/mrk-contract`, which lists the options each script takes. It reads it once for each checkout, and again when the file changes. When a script does not take an option that Barkeep passes, Barkeep runs nothing and says that this mrk is older than Barkeep, with `make pull`, or, when the contract is a later version than Barkeep reads, that this Barkeep is older. When a script refuses, the alert shows the line it marks ✗, not the hint after it. An mrk from before `mrk-contract` (2026-10-29) works as before.
+
 ## Requirements
 
 - macOS 15.0+

@@ -138,6 +138,46 @@ struct MrkCandidate: Identifiable, Hashable, Sendable {
     }
 }
 
+/// What the scripts of an mrk checkout take from a program, as the checkout's
+/// `scripts/mrk-contract` says it (mrk's BIN-1, mrk-contract). MrkRunner reads
+/// it once for each checkout, and again when the file changes, and passes an
+/// option only when the script takes it. So an exit 2 from sync means that it
+/// refuses the command line, for the reason that it gives (sevmorris/mrk
+/// audit 22, O-2). An mrk from before 2026-10-29 has no mrk-contract, and then
+/// Barkeep runs the command and shows the reason sync gives.
+///
+/// Barkeep reads the options alone: MrkCandidate reads the fields of the
+/// --check lines by the line contract.
+struct MrkContract: Decodable, Equatable, Sendable {
+    /// The version this build reads. mrk raises it when it deletes an option,
+    /// a field or a key, moves a field, or gives a word or a key a new
+    /// meaning. A new script, option, field, word or key keeps it.
+    static let supportedVersion = 1
+
+    let contract: Int
+    /// Each script, by its path in the checkout, such as scripts/sync.
+    let scripts: [String: Script]
+
+    struct Script: Decodable, Equatable, Sendable {
+        /// Every option the script takes, each short form apart.
+        let options: [String]
+    }
+
+    static func decode(_ data: Data) throws -> MrkContract {
+        try JSONDecoder().decode(MrkContract.self, from: data)
+    }
+
+    /// Whether this mrk is newer than the contract this build reads.
+    var isNewer: Bool { contract > Self.supportedVersion }
+
+    /// The options of COMMAND that its script does not take. Empty when it
+    /// takes them all, and nil when the contract does not name the script.
+    func missing(_ command: MrkCommand) -> [String]? {
+        guard let script = scripts[command.script] else { return nil }
+        return command.options.filter { !script.options.contains($0) }
+    }
+}
+
 /// What Barkeep asks mrk to do. Each case is one run of one script.
 enum MrkCommand: Equatable, Sendable {
     /// The drift, with each cask's section and each description.
@@ -164,6 +204,16 @@ enum MrkCommand: Equatable, Sendable {
         self == .fixDescriptions ? checkout.checkPickerDesc : checkout.sync
     }
 
+    /// The script, by its path in the checkout, as mrk-contract names it.
+    var script: String {
+        self == .fixDescriptions ? "scripts/check-picker-desc" : "scripts/sync"
+    }
+
+    /// The options the command gives, by name, as mrk-contract lists them.
+    var options: [String] {
+        arguments.filter { $0.hasPrefix("-") }
+    }
+
     /// The arguments, with the kind always given, so a name that is both a
     /// formula and a cask is never left to sync to refuse.
     var arguments: [String] {
@@ -185,7 +235,6 @@ enum MrkCommand: Equatable, Sendable {
 
     /// The command as the console shows it.
     func displayLine(in checkout: MrkCheckout) -> String {
-        let script = self == .fixDescriptions ? "scripts/check-picker-desc" : "scripts/sync"
         let args = arguments.map { $0.contains(" ") ? "\"\($0)\"" : $0 }
         return "$ " + ([script] + args).joined(separator: " ")
     }
@@ -198,6 +247,9 @@ enum MrkCommand: Equatable, Sendable {
 enum MrkError: LocalizedError {
     case failed(command: String, status: Int32, message: String)
     case timedOut(command: String)
+    /// The checkout's mrk-contract does not list an option of the command,
+    /// so Barkeep did not run it.
+    case notTaken(command: String, message: String)
 
     var errorDescription: String? {
         switch self {
@@ -205,6 +257,8 @@ enum MrkError: LocalizedError {
             return message.isEmpty ? "\(command) exited with status \(status)." : message
         case .timedOut(let command):
             return "\(command) did not finish, and Barkeep stopped it."
+        case .notTaken(_, let message):
+            return message
         }
     }
 }
@@ -226,6 +280,12 @@ actor MrkRunner {
     private let timeout: Duration
     private var environment: [String: String]?
     private var runningPID: Int32?
+    /// The contract of each checkout, by its root's path, with the
+    /// modification date that scripts/mrk-contract had when it was read. A
+    /// pull that changes the file changes the date, and the next run reads it
+    /// again. A nil contract is a checkout with none, or one that could not
+    /// be read.
+    private var contracts: [String: (stamp: Date?, contract: MrkContract?)] = [:]
 
     init(environment: @escaping EnvironmentProvider = MrkRunner.loginShellEnvironment,
          timeout: Duration = .seconds(300)) {
@@ -233,15 +293,42 @@ actor MrkRunner {
         self.timeout = timeout
     }
 
+    /// The checkout's mrk-contract, run once and kept until the file changes,
+    /// or nil when the checkout has none or it did not answer with a document
+    /// Barkeep can read.
+    func contract(for checkout: MrkCheckout) async -> MrkContract? {
+        let url = checkout.root.appendingPathComponent("scripts/mrk-contract")
+        let stamp = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+        if let kept = contracts[checkout.root.path], kept.stamp == stamp { return kept.contract }
+        var contract: MrkContract?
+        if stamp != nil, FileManager.default.isExecutableFile(atPath: url.path),
+           let result = try? await ScriptProcess.run(url, environment: await resolvedEnvironment(),
+                                                     currentDirectory: checkout.root, timeout: .seconds(30)),
+           !result.timedOut, result.status == 0 {
+            contract = try? MrkContract.decode(result.stdout)
+        }
+        contracts[checkout.root.path] = (stamp, contract)
+        return contract
+    }
+
     /// Runs the command in the checkout, handing each line of its output to
-    /// `onLine` as it arrives. Throws when the script exits non-zero, with the
-    /// last line it wrote to stderr — where sync says why it refused.
+    /// `onLine` as it arrives. Throws when the script exits non-zero, with
+    /// the reason it wrote to stderr: the last line it marked ✗, or else its
+    /// last line. Throws without running it when the checkout's mrk-contract
+    /// does not list one of its options.
     @discardableResult
     func run(
         _ command: MrkCommand,
         in checkout: MrkCheckout,
         onLine: @escaping @Sendable (String, _ fromStderr: Bool) -> Void = { _, _ in }
     ) async throws -> ScriptResult {
+        let name = String(command.displayLine(in: checkout).dropFirst(2))
+        if let contract = await contract(for: checkout), let missing = contract.missing(command), !missing.isEmpty {
+            let options = missing.joined(separator: " ")
+            throw MrkError.notTaken(command: name, message: contract.isNewer
+                ? "\(command.script) does not take \(options): this Barkeep is older than mrk. Choose Check for Updates… in the Barkeep menu."
+                : "\(command.script) does not take \(options): this mrk is older than Barkeep. Run make pull in \(checkout.root.path).")
+        }
         let env = await resolvedEnvironment()
         let result = try await ScriptProcess.run(
             command.executable(in: checkout),
@@ -253,16 +340,22 @@ actor MrkRunner {
             onLine: { line, fromStderr in onLine(Self.plain(line), fromStderr) }
         )
         runningPID = nil
-        let name = command.displayLine(in: checkout).dropFirst(2)
-        if result.timedOut { throw MrkError.timedOut(command: String(name)) }
+        if result.timedOut { throw MrkError.timedOut(command: name) }
         guard result.status == 0 else {
-            let message = result.stderrText.split(separator: "\n")
-                .map { Self.plain(String($0)).trimmingCharacters(in: .whitespaces) }
-                .last { !$0.isEmpty } ?? ""
-            throw MrkError.failed(command: String(name), status: result.status,
-                                  message: Self.withoutMark(message))
+            throw MrkError.failed(command: name, status: result.status,
+                                  message: Self.reason(in: result.stderrText))
         }
         return result
+    }
+
+    /// Why a script refused: the last line that mrk's err marked ✗, which
+    /// comes before the hints that info adds below it, such as sync's "Run
+    /// sync --help for the options.", or else the last line. Without its mark.
+    static func reason(in stderr: String) -> String {
+        let lines = stderr.split(separator: "\n")
+            .map { plain(String($0)).trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        return withoutMark(lines.last { $0.hasPrefix("✗") } ?? lines.last ?? "")
     }
 
     /// The drift sync sees, with the details Barkeep shows.

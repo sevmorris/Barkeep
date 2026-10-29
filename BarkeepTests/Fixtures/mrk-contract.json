@@ -1,0 +1,101 @@
+{
+  "contract": 1,
+  "about": "What mrk's scripts take from a program, and what their --check lines hold. options: every option of the script. equals: the options that also take their value after an equals sign, as --add=NAME. decisions: the options of one decision, each with the values after it. check: the options that go with --check, and the fields of a line in their order. A field whose with is empty is on every line; one whose with names an option is on a line only with that option. A field with no words holds any text. A new script, option, field, word or key keeps the version. mrk raises it when it deletes an option, a field or a key, moves a field, or gives a word or a key a new meaning. BIN-1 (docs/bin/mrk-usage.html in sevmorris/mrk) says what each option, field and word means.",
+  "scripts": {
+    "scripts/defaults.sh": {
+      "options": ["--with-trackpad", "--check", "--skip", "--unskip", "--key", "--revert", "--help", "-h"],
+      "equals": [],
+      "decisions": [
+        {"option": "--skip", "values": ["DOMAIN", "KEY"]},
+        {"option": "--unskip", "values": ["DOMAIN", "KEY"]},
+        {"option": "--key", "values": ["DOMAIN", "KEY"]},
+        {"option": "--revert", "values": ["DOMAIN", "KEY"]}
+      ],
+      "check": {
+        "options": ["--check", "--with-trackpad"],
+        "fields": [
+          {"field": "domain", "with": "", "words": []},
+          {"field": "key", "with": "", "words": []},
+          {"field": "value", "with": "", "words": []},
+          {"field": "current", "with": "", "words": []},
+          {"field": "state", "with": "", "words": ["set", "differs", "absent", "nodomain", "skipped", "noaccess"]}
+        ]
+      }
+    },
+    "scripts/dock-setup": {
+      "options": ["--dry-run", "-n", "--check", "--help", "-h"],
+      "equals": [],
+      "decisions": [],
+      "check": {
+        "options": ["--check"],
+        "fields": [
+          {"field": "kind", "with": "", "words": ["app", "folder", "unlisted"]},
+          {"field": "line", "with": "", "words": []},
+          {"field": "path", "with": "", "words": []},
+          {"field": "state", "with": "", "words": ["present", "missing"]},
+          {"field": "dock", "with": "", "words": ["docked", "undocked", "unknown"]}
+        ]
+      }
+    },
+    "scripts/snapshot-prefs": {
+      "options": ["--dry-run", "-n", "--check", "--help", "-h"],
+      "equals": [],
+      "decisions": [],
+      "check": {
+        "options": ["--check"],
+        "fields": [
+          {"field": "file", "with": "", "words": []},
+          {"field": "key", "with": "", "words": []},
+          {"field": "change", "with": "", "words": ["added", "deleted", "changed", "unread"]}
+        ]
+      }
+    },
+    "scripts/sync": {
+      "options": ["--dry-run", "-n", "--commit", "-c", "--prune", "-p", "--add", "--ignore", "--section", "--formula", "--cask", "--check", "--details", "--help", "-h"],
+      "equals": [],
+      "decisions": [
+        {"option": "--add", "values": ["NAME"]},
+        {"option": "--section", "values": ["NAME"]},
+        {"option": "--ignore", "values": ["NAME"]},
+        {"option": "--prune", "values": ["NAME"]},
+        {"option": "--formula", "values": []},
+        {"option": "--cask", "values": []}
+      ],
+      "check": {
+        "options": ["--check", "--details"],
+        "fields": [
+          {"field": "action", "with": "", "words": ["add", "prune"]},
+          {"field": "kind", "with": "", "words": ["formula", "cask"]},
+          {"field": "name", "with": "", "words": []},
+          {"field": "section", "with": "--details", "words": []},
+          {"field": "reason", "with": "--details", "words": []},
+          {"field": "description", "with": "--details", "words": []}
+        ]
+      }
+    },
+    "scripts/sync-login-items": {
+      "options": ["--dry-run", "-n", "--commit", "-c", "--check", "--add", "--ignore", "--remove", "--help", "-h"],
+      "equals": ["--add", "--ignore", "--remove"],
+      "decisions": [
+        {"option": "--add", "values": ["NAME"]},
+        {"option": "--ignore", "values": ["NAME"]},
+        {"option": "--remove", "values": ["NAME"]}
+      ],
+      "check": {
+        "options": ["--check"],
+        "fields": [
+          {"field": "action", "with": "", "words": ["add", "remove"]},
+          {"field": "name", "with": "", "words": []},
+          {"field": "path", "with": "", "words": []},
+          {"field": "reason", "with": "", "words": ["new", "stale", "ignored"]}
+        ]
+      }
+    },
+    "scripts/check-picker-desc": {
+      "options": ["--fix", "--help", "-h"],
+      "equals": [],
+      "decisions": [],
+      "check": null
+    }
+  }
+}
