@@ -133,6 +133,8 @@ actor UpdateChecker {
 /// is available. Pass `appState` to keep the toolbar badge in sync.
 @MainActor @discardableResult
 func checkForUpdates(silent: Bool = false, appState: AppState? = nil) async -> AvailableUpdate? {
+    if SelfUpdateFlow.bringForward() { return nil }
+
     let result = await UpdateChecker.shared.check()
 
     switch result {
@@ -149,18 +151,11 @@ func checkForUpdates(silent: Bool = false, appState: AppState? = nil) async -> A
     case .available(let version, let downloadURL, let releaseURL):
         let update = AvailableUpdate(version: version, downloadURL: downloadURL, releaseURL: releaseURL)
         appState?.availableUpdate = update
-        let alert = NSAlert()
-        alert.messageText = "Update Available"
-        alert.informativeText = "Barkeep \(version) is available."
-        alert.addButton(withTitle: "Download")
-        alert.addButton(withTitle: "Release Notes")
-        alert.addButton(withTitle: "Not Now")
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            NSWorkspace.shared.open(downloadURL)
-        } else if response == .alertSecondButtonReturn {
-            NSWorkspace.shared.open(releaseURL)
-        }
+        await SelfUpdateFlow.offer(SelfUpdatePrompt(appName: "Barkeep", version: version,
+                                                    downloadURL: downloadURL, releaseURL: releaseURL,
+                                                    isBusy: { BatchActivity.isRunning },
+                                                    busyMessage: "Barkeep can update when Homebrew has finished."),
+                                   silent: silent)
         return update
 
     case .needsNewerMacOS(let version, let minimum, let installed):
