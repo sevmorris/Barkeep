@@ -13,6 +13,8 @@
 		16241970A2061C114A899AC1 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 076800E1FB5750216D1A8DAF /* AppState.swift */; };
 		18449CDD354A213D6473C885 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C4DBCC4A9E95E0E7A26FC429 /* Assets.xcassets */; };
 		29203C0BDBE982577FC7204F /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 830CF38139D96D05EA9DDD57 /* UpdateChecker.swift */; };
+		C21F6915F17440A20C0C154F /* BatchActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75717C13AA16BDE65AC0922B /* BatchActivity.swift */; };
+		3CED7CB16B545A074C293360 /* SelfUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82E9C7B3ACAD2340824AA1AD /* SelfUpdater.swift */; };
 		3230E86FAA863D041E311B68 /* BarkeepApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 323079A45F04FAB3BF147CEA /* BarkeepApp.swift */; };
 		32A2BC67E0B737F5DF997527 /* ActionPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A5401537BB31A8BE2B168D9 /* ActionPanelView.swift */; };
 		3B9474CD58AE6729752E4330 /* SectionNameSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B5B4C7EE56FE247E01E6A37 /* SectionNameSheet.swift */; };
@@ -39,6 +41,7 @@
 		21C0BE54E76D95D7853C822A /* MrkRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9534DAFFEA645D29E266F003 /* MrkRunner.swift */; };
 		4B7AC1DB77A4A5B061739BF8 /* MrkModeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B906F453C4814168516AE9D9 /* MrkModeViewModel.swift */; };
 		08C89F731AB195CAE4DE659C /* MrkModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153B687DC7F98998089B505D /* MrkModeTests.swift */; };
+		484F19D72777E350D7C5FF21 /* SelfUpdaterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8206B9955C9BEB65360C88AC /* SelfUpdaterTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +73,8 @@
 		7438683DB48E09178234F9D8 /* BrewfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrewfileViewModel.swift; sourceTree = "<group>"; };
 		785D7B9CE182339A802885A4 /* UntrackedViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UntrackedViewModel.swift; sourceTree = "<group>"; };
 		830CF38139D96D05EA9DDD57 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
+		75717C13AA16BDE65AC0922B /* BatchActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchActivity.swift; sourceTree = "<group>"; };
+		82E9C7B3ACAD2340824AA1AD /* SelfUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfUpdater.swift; sourceTree = "<group>"; };
 		833646D9558C3A46E65734BA /* ConsoleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsoleView.swift; sourceTree = "<group>"; };
 		84C8704CD67F4BF7C4C1E0AE /* MultiSelectSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiSelectSummary.swift; sourceTree = "<group>"; };
 		85BDDD39E42E960B6477CCE2 /* BrewRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrewRunner.swift; sourceTree = "<group>"; };
@@ -87,6 +92,7 @@
 		9534DAFFEA645D29E266F003 /* MrkRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MrkRunner.swift; sourceTree = "<group>"; };
 		B906F453C4814168516AE9D9 /* MrkModeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MrkModeViewModel.swift; sourceTree = "<group>"; };
 		153B687DC7F98998089B505D /* MrkModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MrkModeTests.swift; sourceTree = "<group>"; };
+		8206B9955C9BEB65360C88AC /* SelfUpdaterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelfUpdaterTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -95,6 +101,7 @@
 			children = (
 				DA483CBD6AB1F29CFF880E2F /* BarkeepTests.swift */,
 				153B687DC7F98998089B505D /* MrkModeTests.swift */,
+				8206B9955C9BEB65360C88AC /* SelfUpdaterTests.swift */,
 			);
 			path = BarkeepTests;
 			sourceTree = "<group>";
@@ -107,6 +114,8 @@
 				85BDDD39E42E960B6477CCE2 /* BrewRunner.swift */,
 				1515D8935F4133FF1B61B619 /* NotificationService.swift */,
 				830CF38139D96D05EA9DDD57 /* UpdateChecker.swift */,
+				75717C13AA16BDE65AC0922B /* BatchActivity.swift */,
+				82E9C7B3ACAD2340824AA1AD /* SelfUpdater.swift */,
 				9534DAFFEA645D29E266F003 /* MrkRunner.swift */,
 				3913484AFF88E74D0B3F753A /* ShellEnvironment.swift */,
 				C991CA2D153152BD7F36AC97 /* MrkText.swift */,
@@ -300,6 +309,8 @@
 				5240236D547818EFE4C33927 /* RootContentView.swift in Sources */,
 				3B9474CD58AE6729752E4330 /* SectionNameSheet.swift in Sources */,
 				29203C0BDBE982577FC7204F /* UpdateChecker.swift in Sources */,
+				C21F6915F17440A20C0C154F /* BatchActivity.swift in Sources */,
+				3CED7CB16B545A074C293360 /* SelfUpdater.swift in Sources */,
 				4B7AC1DB77A4A5B061739BF8 /* MrkModeViewModel.swift in Sources */,
 				21C0BE54E76D95D7853C822A /* MrkRunner.swift in Sources */,
 				EA4506AC362A50C86217DCE9 /* ShellEnvironment.swift in Sources */,
@@ -314,6 +325,7 @@
 			files = (
 				7F747DD3D6F937D13DF5A9C6 /* BarkeepTests.swift in Sources */,
 				08C89F731AB195CAE4DE659C /* MrkModeTests.swift in Sources */,
+				484F19D72777E350D7C5FF21 /* SelfUpdaterTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

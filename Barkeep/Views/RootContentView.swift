@@ -46,6 +46,9 @@ struct RootContentView: View {
             brewfileWatcher.start(url: url)
             if mrk.isActive { Task { await mrk.refresh() } }
         }
+        .onChange(of: isRunning || mrk.isBusy) { _, busy in
+            BatchActivity.set(mrk, running: busy)
+        }
         .onChange(of: mrk.isChecking) { _, checking in
             // In mrk mode the Untracked list is sync's drift, read again
             // after every decision and every brew command.
