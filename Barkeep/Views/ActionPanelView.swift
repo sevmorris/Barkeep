@@ -31,6 +31,27 @@ struct ActionPanelView: View {
     /// Brewfile entries waiting on the uninstall question.
     @State private var pendingUninstall: [BrewfileEntry] = []
     @State private var showUninstallDialog = false
+    /// Brewfile entries waiting on the remove question, asked when Homebrew
+    /// has some of them installed.
+    @State private var pendingRemove: PendingRemove? = nil
+    @State private var showRemoveDialog = false
+
+    private struct PendingRemove {
+        /// Every entry Remove was pressed for.
+        let entries: [BrewfileEntry]
+        /// The ones Homebrew has installed, which the question is about.
+        let installed: [BrewfileEntry]
+        /// Each installed one is a cask Homebrew can forget while its app
+        /// stays (HomebrewRecord.canForget).
+        let canKeepApps: Bool
+
+        /// The others, removed as Remove always has: taps, and packages
+        /// that are not installed.
+        var rest: [BrewfileEntry] {
+            let installedIDs = Set(installed.map(\.id))
+            return entries.filter { !installedIDs.contains($0.id) }
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -64,6 +85,26 @@ struct ActionPanelView: View {
             Text(entries.count == 1
                  ? "Removing its Brewfile entry too stops brew bundle from installing it again."
                  : "Removing their Brewfile entries too stops brew bundle from installing them again.")
+        }
+        .confirmationDialog(removeTitle, isPresented: $showRemoveDialog,
+                            titleVisibility: .visible, presenting: pendingRemove) { pending in
+            let one = pending.installed.count == 1
+            Button(one ? "Remove and Uninstall" : "Remove and Uninstall \(pending.installed.count)",
+                   role: .destructive) {
+                Task { await removeUninstalling(pending) }
+            }
+            if pending.canKeepApps {
+                Button(one ? "Remove and Keep the App Outside Homebrew"
+                           : "Remove and Keep the Apps Outside Homebrew") {
+                    Task { await removeForgetting(pending) }
+                }
+            }
+            Button("Remove from Brewfile Only") {
+                remove(pending.entries)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { pending in
+            Text(removeMessage(pending))
         }
         .sheet(item: $pendingAdd) { pending in
             let formulae = pending.packages.filter { $0.kind == .formula }
@@ -105,6 +146,61 @@ struct ActionPanelView: View {
         guard !entries.isEmpty else { return }
         pendingUninstall = entries
         showUninstallDialog = true
+    }
+
+    /// Remove from Brewfile. An entry whose package Homebrew has installed
+    /// would leave it installed and upgraded, so Barkeep asks first what
+    /// happens to it: uninstall it, keep its app outside Homebrew, or leave
+    /// it to Homebrew. With none installed it removes them at once, as
+    /// before.
+    private func confirmRemove(_ entries: [BrewfileEntry]) async {
+        guard !isRunning, !entries.isEmpty else { return }
+        guard let prefix = try? BrewRunner.shared.prefix() else {
+            remove(entries)
+            return
+        }
+        let installed = entries.filter {
+            HomebrewRecord.isInstalled(name: $0.name, kind: $0.kind, prefix: prefix)
+        }
+        guard !installed.isEmpty else {
+            remove(entries)
+            return
+        }
+        var canKeepApps = false
+        if installed.allSatisfy({ $0.kind == .cask }) {
+            isRunning = true
+            let forgettable = await BrewRunner.shared.forgettableCasks(installed.map(\.name))
+            isRunning = false
+            canKeepApps = installed.allSatisfy { forgettable.contains(HomebrewRecord.shortName($0.name)) }
+        }
+        pendingRemove = PendingRemove(entries: entries, installed: installed, canKeepApps: canKeepApps)
+        showRemoveDialog = true
+    }
+
+    private var removeTitle: String {
+        guard let entries = pendingRemove?.entries else { return "" }
+        return entries.count == 1
+            ? "Remove \(entries[0].name) from the Brewfile?"
+            : "Remove \(entries.count) entries from the Brewfile?"
+    }
+
+    private func removeMessage(_ pending: PendingRemove) -> String {
+        let installed = pending.installed
+        let one = installed.count == 1
+        let name = one ? installed[0].name : ""
+        var message = one
+            ? "Homebrew has \(name) installed. Removed from the Brewfile only, it stays installed and Homebrew goes on upgrading it."
+            : "Homebrew has \(installed.count) of them installed. Removed from the Brewfile only, they stay installed and Homebrew goes on upgrading them."
+        if pending.canKeepApps {
+            message += one
+                ? " Keeping the app outside Homebrew leaves it in Applications and makes Homebrew forget it, so you update it yourself."
+                : " Keeping the apps outside Homebrew leaves them in Applications and makes Homebrew forget them, so you update them yourself."
+        } else if installed.allSatisfy({ $0.kind == .cask }) {
+            message += one
+                ? " Homebrew cannot forget \(name) and leave it working, since it installs more than an app."
+                : " Homebrew cannot forget them all and leave them working, since one or more installs more than an app."
+        }
+        return message
     }
 
     // MARK: - Content dispatch
@@ -234,8 +330,8 @@ struct ActionPanelView: View {
 
         Divider().padding(.vertical, 2)
 
-        actionButton("Remove from Brewfile", icon: "minus.circle", role: .destructive) {
-            remove([entry])
+        actionButton("Remove from Brewfile…", icon: "minus.circle", role: .destructive) {
+            Task { await confirmRemove([entry]) }
         }
     }
 
@@ -305,9 +401,9 @@ struct ActionPanelView: View {
             Divider().padding(.vertical, 2)
         }
 
-        actionButton("Remove \(selected.count) from Brewfile",
+        actionButton("Remove \(selected.count) from Brewfile…",
                      icon: "minus.circle", role: .destructive) {
-            remove(selected)
+            Task { await confirmRemove(selected) }
         }
     }
 
@@ -361,7 +457,7 @@ struct ActionPanelView: View {
             actionButton("Ignore", icon: "eye.slash") {
                 Task { await runMrk?([.ignore(name: pkg.name, kind: pkg.kind)]) }
             }
-            Text("Ignore adds it to ~/.mrk/sync-ignore, so sync and Barkeep stop offering it.")
+            Text("Ignore adds it to ~/.mrk/sync-ignore, so sync and Barkeep stop offering it. Homebrew keeps it installed and goes on upgrading it.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -561,6 +657,58 @@ struct ActionPanelView: View {
         guard removeFromBrewfile, !uninstalled.isEmpty else { return }
         brewfileVM.remove(packages: uninstalled, brewfileURL: brewfilePath)
         log.append("Removed \(uninstalled.count) from the Brewfile.")
+    }
+
+    /// Remove and Uninstall: uninstall the installed entries and remove the
+    /// ones brew uninstalled, as Uninstall… does; then remove the rest as
+    /// Remove always has. A failed uninstall keeps its entry.
+    private func removeUninstalling(_ pending: PendingRemove) async {
+        await uninstall(pending.installed, removeFromBrewfile: true)
+        remove(pending.rest)
+    }
+
+    /// Remove and Keep the App Outside Homebrew: Homebrew forgets each
+    /// installed cask (HomebrewRecord.forget), its entry goes, and the app
+    /// stays where it is; then the rest go as Remove always has. A cask
+    /// Homebrew could not forget keeps its entry.
+    private func removeForgetting(_ pending: PendingRemove) async {
+        guard !isRunning else { return }
+        isRunning = true
+        log.clear()
+        var forgotten: [(name: String, kind: PackageKind)] = []
+        var failures: [String] = []
+        do {
+            let caskroom = try BrewRunner.shared.prefix().appendingPathComponent("Caskroom", isDirectory: true)
+            for entry in pending.installed {
+                let short = HomebrewRecord.shortName(entry.name)
+                log.append("Deleting Homebrew's record of \(short): \(caskroom.appendingPathComponent(short).path)")
+                do {
+                    try HomebrewRecord.forget(cask: entry.name, caskroom: caskroom)
+                    await BrewRunner.shared.invalidateCache(names: [entry.name])
+                    forgotten.append((entry.name, entry.kind))
+                } catch {
+                    log.append("Error: \(error.localizedDescription)", level: .error)
+                    failures.append(error.localizedDescription)
+                }
+            }
+        } catch {
+            log.append("Error: \(error.localizedDescription)", level: .error)
+            failures.append(error.localizedDescription)
+        }
+
+        log.append("Done. Homebrew forgot \(forgotten.count) of \(pending.installed.count); "
+                   + "the apps stay in Applications, and Homebrew no longer upgrades them.")
+        if !forgotten.isEmpty {
+            brewfileVM.remove(packages: forgotten, brewfileURL: brewfilePath)
+            log.append("Removed \(forgotten.count) from the Brewfile.")
+        }
+        await brewfileVM.refreshOutdated()
+        if let mrk, mrk.isActive { await mrk.refresh() }
+        isRunning = false
+        remove(pending.rest)
+        if !failures.isEmpty {
+            onError(failures.joined(separator: "\n"))
+        }
     }
 
     /// Sequentially uninstall each package — one failure doesn't stop the rest.

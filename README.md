@@ -9,6 +9,7 @@ Barkeep is a native macOS app for managing Homebrew packages. Browse and manage 
 - **Brewfile view** — packages grouped by section with inline search; select any to see description, version, dependencies, examples, man page, and more
 - **Console** — streaming brew command output
 - **Actions** — install, uninstall, upgrade, or remove from Brewfile for any selected package. Uninstall asks whether to remove the Brewfile entry too
+- **Remove from Brewfile** asks what happens to a package Homebrew still has installed, which it would otherwise go on upgrading: uninstall it, keep the app outside Homebrew, or leave it installed. Keeping the app, offered for a cask that installs only apps and links into them, deletes the cask's record in Homebrew's Caskroom, so the app stays in Applications and you update it yourself. Adopt hands it back to Homebrew
 - New casks follow the Brewfile's style: `greedy: true` when most of its casks carry it
 - **mrk mode** — in an mrk checkout, adds, ignores and prunes go through mrk's `sync` (below)
 - Defaults to `~/mrk/Brewfile`; any Brewfile location can be selected

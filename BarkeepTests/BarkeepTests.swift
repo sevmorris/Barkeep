@@ -558,3 +558,187 @@ struct BarkeepLinkTests {
         #expect(types.flatMap { $0["CFBundleURLSchemes"] as? [String] ?? [] } == [BarkeepLink.scheme])
     }
 }
+
+// MARK: - HomebrewRecord
+
+/// Runs `body` with a scratch Homebrew prefix and an Applications folder of
+/// its own, both removed afterwards. Nothing here touches the real Caskroom.
+private func withScratchPrefix(_ body: (_ prefix: URL, _ applications: URL) throws -> Void) throws {
+    let folder = FileManager.default.temporaryDirectory
+        .appendingPathComponent("barkeep-homebrew-\(UUID().uuidString)", isDirectory: true)
+    let prefix = folder.appendingPathComponent("homebrew", isDirectory: true)
+    let applications = folder.appendingPathComponent("Applications", isDirectory: true)
+    for dir in ["Cellar", "Caskroom"] {
+        try FileManager.default.createDirectory(at: prefix.appendingPathComponent(dir), withIntermediateDirectories: true)
+    }
+    try FileManager.default.createDirectory(at: applications, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    try body(prefix, applications)
+}
+
+@Suite("HomebrewRecord")
+struct HomebrewRecordTests {
+    /// The artifacts of an installed cask, as `brew info --json=v2` gives
+    /// them: one stanza each, and where it went.
+    private func artifacts(_ json: String) throws -> [[String: Any]] {
+        let data = try #require(json.data(using: .utf8))
+        return try #require(try JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+    }
+
+    private let everywhere: (String) -> Bool = { _ in true }
+
+    @Test("A cask of an app, and links into it, can be forgotten")
+    func appAndLinksIntoIt() throws {
+        // Calibre's, cut short.
+        let calibre = try artifacts("""
+        [{"uninstall": [{"quit": "net.kovidgoyal.calibre"}]},
+         {"app": ["calibre.app"], "target": "/Applications/calibre.app"},
+         {"binary": ["/Applications/calibre.app/Contents/MacOS/ebook-convert"], "target": "/opt/homebrew/bin/ebook-convert"},
+         {"binary": ["/Applications/calibre.app/Contents/MacOS/calibredb"], "target": "/opt/homebrew/bin/calibredb"},
+         {"zap": [{"trash": ["~/Library/Preferences/calibre"]}]}]
+        """)
+        #expect(HomebrewRecord.canForget(artifacts: calibre, exists: everywhere))
+        let whatsapp = try artifacts("""
+        [{"uninstall": [{"quit": "net.whatsapp.WhatsApp"}]},
+         {"app": ["WhatsApp.app"], "target": "/Applications/WhatsApp.app"},
+         {"zap": [{"trash": ["~/Library/Containers/net.whatsapp.WhatsApp"]}]}]
+        """)
+        #expect(HomebrewRecord.canForget(artifacts: whatsapp, exists: everywhere))
+    }
+
+    @Test("A cask that installs more than an app cannot")
+    func moreThanAnApp() throws {
+        let cases = [
+            // android-platform-tools: its programs live in the Caskroom.
+            #"[{"binary": ["/opt/homebrew/Caskroom/android-platform-tools/37.0.2/platform-tools/adb"], "target": "/opt/homebrew/bin/adb"}]"#,
+            // temurin@21: a pkg.
+            #"[{"uninstall": [{"pkgutil": "net.temurin.21.jdk"}]}, {"pkg": ["OpenJDK21U-jdk.pkg"]}, {"zap": []}]"#,
+            // An app, and a program beside it in the Caskroom.
+            #"[{"app": ["Foo.app"], "target": "/Applications/Foo.app"}, {"binary": ["foo/bin/foo"], "target": "/opt/homebrew/bin/foo"}]"#,
+            // An app, and a link into another app's folder whose name it begins.
+            #"[{"app": ["Foo.app"], "target": "/Applications/Foo.app"}, {"binary": ["/Applications/Foo.app.old/foo"], "target": "/opt/homebrew/bin/foo"}]"#,
+            // An app and a postflight, which can put files anywhere.
+            #"[{"app": ["Foo.app"], "target": "/Applications/Foo.app"}, {"postflight": null}]"#,
+            // An app and a font.
+            #"[{"app": ["Foo.app"], "target": "/Applications/Foo.app"}, {"font": ["Foo.otf"], "target": "/Users/x/Library/Fonts/Foo.otf"}]"#,
+            // Nothing installed at all.
+            #"[{"zap": []}]"#,
+        ]
+        for json in cases {
+            #expect(!HomebrewRecord.canForget(artifacts: try artifacts(json), exists: everywhere), "\(json)")
+        }
+    }
+
+    @Test("A cask whose app has gone cannot")
+    func appGone() throws {
+        let foo = try artifacts(#"[{"app": ["Foo.app"], "target": "/Applications/Foo.app"}]"#)
+        #expect(!HomebrewRecord.canForget(artifacts: foo, exists: { _ in false }))
+    }
+
+    @Test("A renamed app is looked for under its new name")
+    func renamedApp() throws {
+        let foo = try artifacts(#"[{"app": ["Foo Beta.app", {"target": "Foo.app"}]}, {"binary": ["/Applications/Foo.app/Contents/MacOS/foo"]}]"#)
+        #expect(HomebrewRecord.canForget(artifacts: foo, exists: { $0 == "/Applications/Foo.app" }))
+    }
+
+    @Test("Only installed casks are forgettable, by their short names")
+    func forgettable() {
+        let json = """
+        {"formulae": [], "casks": [
+          {"token": "calibre", "installed": "9.17.0",
+           "artifacts": [{"app": ["calibre.app"], "target": "/Applications/calibre.app"}]},
+          {"token": "temurin@21", "installed": "21.0.13,9",
+           "artifacts": [{"pkg": ["OpenJDK21U-jdk.pkg"]}]},
+          {"token": "someone/tap/foo", "installed": "1.0",
+           "artifacts": [{"app": ["Foo.app"], "target": "/Applications/Foo.app"}]},
+          {"token": "bar", "installed": null,
+           "artifacts": [{"app": ["Bar.app"]}]}
+        ]}
+        """
+        #expect(HomebrewRecord.forgettable(infoJSON: json, exists: everywhere) == ["calibre", "foo"])
+        #expect(HomebrewRecord.forgettable(infoJSON: "Error: No available cask", exists: everywhere).isEmpty)
+    }
+
+    @Test("Names become folder names, and nothing else does")
+    func names() {
+        #expect(HomebrewRecord.shortName("calibre") == "calibre")
+        #expect(HomebrewRecord.shortName("someone/tap/foo") == "foo")
+        for name in ["calibre", "temurin@21", "4k-video-downloader+", "font-sf-mono", "python@3.13"] {
+            #expect(HomebrewRecord.isFolderName(name), "\(name)")
+        }
+        for name in ["", ".", "..", ".metadata", "a/b", "-rf", "foo bar"] {
+            #expect(!HomebrewRecord.isFolderName(name), "\(name)")
+        }
+    }
+
+    @Test("Installed means Homebrew's folder is there")
+    func installed() throws {
+        try withScratchPrefix { prefix, _ in
+            try FileManager.default.createDirectory(at: prefix.appendingPathComponent("Cellar/wget/1.25.0"),
+                                                    withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: prefix.appendingPathComponent("Caskroom/calibre/9.17.0"),
+                                                    withIntermediateDirectories: true)
+            #expect(HomebrewRecord.isInstalled(name: "wget", kind: .formula, prefix: prefix))
+            #expect(HomebrewRecord.isInstalled(name: "calibre", kind: .cask, prefix: prefix))
+            #expect(HomebrewRecord.isInstalled(name: "someone/tap/calibre", kind: .cask, prefix: prefix))
+            #expect(!HomebrewRecord.isInstalled(name: "calibre", kind: .formula, prefix: prefix))
+            #expect(!HomebrewRecord.isInstalled(name: "curl", kind: .formula, prefix: prefix))
+            #expect(!HomebrewRecord.isInstalled(name: "homebrew/cask", kind: .tap, prefix: prefix))
+            #expect(!HomebrewRecord.isInstalled(name: "..", kind: .cask, prefix: prefix))
+        }
+    }
+
+    @Test("Forgetting deletes the record and keeps the app")
+    func forgetKeepsTheApp() throws {
+        try withScratchPrefix { prefix, applications in
+            let fm = FileManager.default
+            let app = applications.appendingPathComponent("calibre.app")
+            let program = app.appendingPathComponent("Contents/MacOS/calibre")
+            try fm.createDirectory(at: program.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try "#!/bin/sh\n".write(to: program, atomically: true, encoding: .utf8)
+            // What Homebrew leaves: the cask file, and a link to the app it moved.
+            let record = prefix.appendingPathComponent("Caskroom/calibre")
+            try fm.createDirectory(at: record.appendingPathComponent(".metadata/9.17.0/20261024230900.000/Casks"),
+                                   withIntermediateDirectories: true)
+            try "{}".write(to: record.appendingPathComponent(".metadata/9.17.0/20261024230900.000/Casks/calibre.json"),
+                           atomically: true, encoding: .utf8)
+            try fm.createDirectory(at: record.appendingPathComponent("9.17.0"), withIntermediateDirectories: true)
+            try fm.createSymbolicLink(at: record.appendingPathComponent("9.17.0/calibre.app"), withDestinationURL: app)
+
+            try HomebrewRecord.forget(cask: "calibre", caskroom: prefix.appendingPathComponent("Caskroom"))
+
+            #expect(!fm.fileExists(atPath: record.path))
+            #expect(fm.fileExists(atPath: program.path))
+            #expect(!HomebrewRecord.isInstalled(name: "calibre", kind: .cask, prefix: prefix))
+        }
+    }
+
+    @Test("A record that holds an app itself is left alone")
+    func forgetRefusesARealApp() throws {
+        try withScratchPrefix { prefix, _ in
+            let fm = FileManager.default
+            let record = prefix.appendingPathComponent("Caskroom/foo")
+            let app = record.appendingPathComponent("1.0/Foo.app/Contents")
+            try fm.createDirectory(at: app, withIntermediateDirectories: true)
+
+            #expect(throws: HomebrewRecord.ForgetError.holdsApp(cask: "foo", app: "Foo.app")) {
+                try HomebrewRecord.forget(cask: "foo", caskroom: prefix.appendingPathComponent("Caskroom"))
+            }
+            #expect(fm.fileExists(atPath: app.path))
+        }
+    }
+
+    @Test("A name with no record, or no folder name, is refused")
+    func forgetRefusesBadNames() throws {
+        try withScratchPrefix { prefix, _ in
+            let caskroom = prefix.appendingPathComponent("Caskroom")
+            #expect(throws: HomebrewRecord.ForgetError.notInstalled("foo")) {
+                try HomebrewRecord.forget(cask: "foo", caskroom: caskroom)
+            }
+            #expect(throws: HomebrewRecord.ForgetError.badName("..")) {
+                try HomebrewRecord.forget(cask: "..", caskroom: caskroom)
+            }
+            #expect(FileManager.default.fileExists(atPath: caskroom.path))
+        }
+    }
+}
