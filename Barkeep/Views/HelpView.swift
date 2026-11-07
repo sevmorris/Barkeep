@@ -37,7 +37,8 @@ struct HelpView: View {
                     definition("Upgrade",              as: "Upgrade to the latest version (shown when an update is available)")
                     definition("Install",              as: "Install the package via brew")
                     definition("Uninstall…",           as: "Remove the package from your system. Barkeep asks whether to remove its Brewfile entry too, or keep it so brew bundle installs it again")
-                    definition("Remove from Brewfile", as: "Delete the entry from your Brewfile without uninstalling")
+                    definition("Remove from Brewfile…", as: "Delete the entry from your Brewfile. When Homebrew has the package installed, Barkeep asks what happens to it: uninstall it; keep the app outside Homebrew, which leaves it in Applications and has Homebrew forget it, so Homebrew stops upgrading it and you update it yourself; or remove the entry only, so Homebrew keeps it installed and goes on upgrading it")
+                    definition("Keep the App Outside Homebrew", as: "Offered for a cask that installs only apps, and links to programs inside them. Barkeep deletes the cask's folder in Homebrew's Caskroom, the record Homebrew keeps of it; Adopt is the way back")
                 }
 
                 section("mrk Mode") {

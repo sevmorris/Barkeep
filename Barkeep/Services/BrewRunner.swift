@@ -89,13 +89,19 @@ actor BrewRunner {
 
     // MARK: - Executable
 
-    private func brewExecutable() throws -> URL {
+    private nonisolated func brewExecutable() throws -> URL {
         for path in ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"] {
             if FileManager.default.isExecutableFile(atPath: path) {
                 return URL(fileURLWithPath: path)
             }
         }
         throw BrewError.notFound
+    }
+
+    /// Homebrew's prefix, /opt/homebrew or /usr/local: the folder above the
+    /// bin that holds brew. Its Cellar and Caskroom are in it.
+    nonisolated func prefix() throws -> URL {
+        try brewExecutable().deletingLastPathComponent().deletingLastPathComponent()
     }
 
     private static func brewEnvironment() -> [String: String] {
@@ -275,6 +281,16 @@ actor BrewRunner {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
             .sorted()
+    }
+
+    /// The casks among `names` that Homebrew can forget while their apps
+    /// stay where they are (HomebrewRecord.canForget), by their short names.
+    /// Empty when brew cannot describe them.
+    func forgettableCasks(_ names: [String]) async -> Set<String> {
+        guard !names.isEmpty,
+              let json = try? await capture(["info", "--json=v2", "--cask"] + names)
+        else { return [] }
+        return HomebrewRecord.forgettable(infoJSON: json)
     }
 
     /// Fetch detailed info for one or more packages via `brew info --json=v2`.
@@ -585,5 +601,164 @@ actor BrewRunner {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         return (summary, examples)
+    }
+}
+
+// MARK: - Homebrew's records
+
+/// What Homebrew keeps of an installed package, read and changed without
+/// running brew: a formula's folder in the Cellar and a cask's in the
+/// Caskroom, both in Homebrew's prefix.
+///
+/// Removing a package from the Brewfile leaves it installed, so Homebrew goes
+/// on upgrading it. When its app is updated by hand instead, Homebrew's
+/// record falls behind, and `brew outdated` offers the version that is
+/// already there: Calibre on 2026-11-06, updated to 9.18.0 while the
+/// Caskroom still said 9.17.0. Barkeep's Remove asks what happens to an
+/// installed package, and one answer is to keep the app and have Homebrew
+/// forget the cask (`forget`). That is the reverse of `brew install --adopt`,
+/// which Adopt runs, and Homebrew has no command for it.
+enum HomebrewRecord {
+    enum ForgetError: LocalizedError, Equatable {
+        case badName(String)
+        case notInstalled(String)
+        /// The cask's folder holds an app itself, not a link to one.
+        case holdsApp(cask: String, app: String)
+
+        var errorDescription: String? {
+            switch self {
+            case .badName(let name):
+                return "“\(name)” is not a name Homebrew gives a cask."
+            case .notInstalled(let name):
+                return "Homebrew has no record of \(name) in its Caskroom."
+            case .holdsApp(let cask, let app):
+                return "Homebrew's folder for \(cask) holds \(app) itself, not a link to it, so Barkeep leaves it alone."
+            }
+        }
+    }
+
+    /// The stanzas of a cask that install nothing: what uninstall and zap
+    /// delete. A preflight or postflight can put files anywhere, the
+    /// Caskroom included, so a cask with one is never forgotten.
+    static let inertStanzas: Set<String> = ["uninstall", "zap", "uninstall_preflight", "uninstall_postflight"]
+
+    /// A Brewfile name as Homebrew names the folder: `user/tap/foo` is `foo`.
+    static func shortName(_ name: String) -> String {
+        name.split(separator: "/").last.map(String.init) ?? name
+    }
+
+    /// A name that can only be a folder directly in the Cellar or the
+    /// Caskroom: no slash, and nothing that starts with a dot.
+    static func isFolderName(_ name: String) -> Bool {
+        name.range(of: #"^[A-Za-z0-9][A-Za-z0-9@+._-]*$"#, options: .regularExpression) != nil
+    }
+
+    /// The folder Homebrew keeps for an installed `name`, or nil for a tap
+    /// or a name no folder has. A formula named by an alias (`python` for
+    /// `python@3.13`) is not found, so Remove treats it as not installed.
+    static func folder(name: String, kind: PackageKind, prefix: URL) -> URL? {
+        let short = shortName(name)
+        guard isFolderName(short) else { return nil }
+        switch kind {
+        case .formula: return prefix.appendingPathComponent("Cellar", isDirectory: true)
+            .appendingPathComponent(short, isDirectory: true)
+        case .cask: return prefix.appendingPathComponent("Caskroom", isDirectory: true)
+            .appendingPathComponent(short, isDirectory: true)
+        case .tap: return nil
+        }
+    }
+
+    /// Whether Homebrew has `name` installed: its folder is there.
+    static func isInstalled(name: String, kind: PackageKind, prefix: URL,
+                            fileManager: FileManager = .default) -> Bool {
+        guard let folder = folder(name: name, kind: kind, prefix: prefix) else { return false }
+        var isDirectory: ObjCBool = false
+        return fileManager.fileExists(atPath: folder.path, isDirectory: &isDirectory) && isDirectory.boolValue
+    }
+
+    /// Whether Homebrew can forget a cask, from its `brew info --json=v2`
+    /// artifacts, and leave everything it installed working. Each artifact
+    /// that installs something must be an app, which Homebrew moved into the
+    /// Applications folder, or a link to a program inside one of those apps,
+    /// as Calibre's `ebook-convert` is. Those links stay, and work while the
+    /// app does; `brew cleanup` prunes them once they are broken. A pkg, an
+    /// installer, a binary in the Caskroom (android-platform-tools), a font
+    /// and the rest are Homebrew's to remove.
+    ///
+    /// An installed cask's artifact carries `target`, where it went; `exists`
+    /// says whether each app is still there.
+    static func canForget(artifacts: [[String: Any]],
+                          exists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }) -> Bool {
+        var apps: [String] = []
+        var binaries: [String] = []
+        for artifact in artifacts {
+            for (stanza, value) in artifact where stanza != "target" {
+                if inertStanzas.contains(stanza) { continue }
+                guard let values = value as? [Any], let source = values.first as? String else { return false }
+                switch stanza {
+                case "app":
+                    let renamed = (values.dropFirst().first as? [String: Any])?["target"] as? String
+                    let path = artifact["target"] as? String ?? "/Applications/" + (renamed ?? source)
+                    guard path.hasPrefix("/") else { return false }
+                    apps.append(path)
+                case "binary":
+                    binaries.append(source)
+                default:
+                    return false
+                }
+            }
+        }
+        guard !apps.isEmpty, apps.allSatisfy(exists) else { return false }
+        return binaries.allSatisfy { source in apps.contains { source.hasPrefix($0 + "/") } }
+    }
+
+    /// The short names of the casks in a `brew info --json=v2 --cask`
+    /// document that Homebrew has installed and can forget.
+    static func forgettable(infoJSON: String,
+                            exists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }) -> Set<String> {
+        guard let data = infoJSON.data(using: .utf8),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let casks = root["casks"] as? [[String: Any]]
+        else { return [] }
+        var names = Set<String>()
+        for cask in casks {
+            guard let token = cask["token"] as? String, cask["installed"] is String,
+                  let artifacts = cask["artifacts"] as? [[String: Any]],
+                  canForget(artifacts: artifacts, exists: exists)
+            else { continue }
+            names.insert(shortName(token))
+        }
+        return names
+    }
+
+    /// Makes Homebrew forget the cask `name` by deleting its folder in
+    /// `caskroom`, and leaves its app where it is. The folder holds the cask
+    /// file Homebrew installed from, and a link to each app it moved; the
+    /// links are deleted, not what they point to. A folder that holds an app
+    /// itself is refused, and nothing is deleted.
+    static func forget(cask name: String, caskroom: URL, fileManager: FileManager = .default) throws {
+        let short = shortName(name)
+        guard isFolderName(short) else { throw ForgetError.badName(name) }
+        let folder = caskroom.appendingPathComponent(short, isDirectory: true)
+        let attributes = try? fileManager.attributesOfItem(atPath: folder.path)
+        guard attributes?[.type] as? FileAttributeType == .typeDirectory else {
+            throw ForgetError.notInstalled(short)
+        }
+        // The enumerator does not follow links, so it never reaches into
+        // the apps they point to.
+        let keys: [URLResourceKey] = [.isSymbolicLinkKey]
+        if let items = fileManager.enumerator(at: folder, includingPropertiesForKeys: keys) {
+            for case let item as URL in items {
+                if item.lastPathComponent == ".metadata" {
+                    items.skipDescendants()
+                    continue
+                }
+                let isLink = (try? item.resourceValues(forKeys: Set(keys)))?.isSymbolicLink == true
+                if item.pathExtension == "app", !isLink {
+                    throw ForgetError.holdsApp(cask: short, app: item.lastPathComponent)
+                }
+            }
+        }
+        try fileManager.removeItem(at: folder)
     }
 }
