@@ -398,21 +398,17 @@ actor BrewRunner {
 
     // MARK: - Outdated
 
-    /// Returns the names of all outdated formulae and casks.
-    func outdatedNames() async -> Set<String> {
-        guard let json = try? await capture(["outdated", "--json"]),
-              let data = json.data(using: .utf8),
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return [] }
-
-        var names = Set<String>()
-        if let formulae = root["formulae"] as? [[String: Any]] {
-            formulae.compactMap { $0["name"] as? String }.forEach { names.insert($0) }
-        }
-        if let casks = root["casks"] as? [[String: Any]] {
-            casks.compactMap { $0["name"] as? String }.forEach { names.insert($0) }
-        }
-        return names
+    /// What `brew outdated` reports, asked twice: as is, and with `--greedy`
+    /// for the casks whose apps update themselves. Empty when brew fails or
+    /// prints something other than its JSON.
+    func outdated() async -> BrewOutdated {
+        async let plainJSON  = try? capture(["outdated", "--json=v2"])
+        async let greedyJSON = try? capture(["outdated", "--json=v2", "--greedy"])
+        let plain  = await plainJSON.flatMap(BrewOutdated.names(fromJSON:))
+        let greedy = await greedyJSON.flatMap(BrewOutdated.names(fromJSON:))
+        return BrewOutdated(formulae: plain?.formulae ?? greedy?.formulae ?? [],
+                            casks: plain?.casks ?? [],
+                            greedyCasks: greedy?.casks ?? [])
     }
 
 
@@ -601,6 +597,56 @@ actor BrewRunner {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         return (summary, examples)
+    }
+}
+
+// MARK: - Outdated
+
+/// The packages `brew outdated` lists, and which of them a Brewfile entry
+/// counts as outdated.
+///
+/// A cask marked `auto_updates` in Homebrew (an app that updates itself,
+/// such as nordvpn or gcloud-cli) is listed only under `--greedy`. A
+/// Brewfile line with `greedy: true` asks `brew upgrade` and `brew bundle`
+/// to upgrade such a cask anyway, and mrk's Brewfile puts it on every cask,
+/// so mrk-status, and Dipstick, list them. Barkeep 1.19.1 and earlier asked
+/// without `--greedy` and showed no update for them. A line without
+/// `greedy: true` leaves the app to update itself, so its cask counts only
+/// when the plain list has it: Homebrew's record of an app that updated
+/// itself lags, and the greedy list would offer what is already there.
+struct BrewOutdated: Equatable, Sendable {
+    var formulae: Set<String> = []
+    /// `brew outdated`'s casks.
+    var casks: Set<String> = []
+    /// `brew outdated --greedy`'s casks: the plain list and the casks
+    /// whose apps update themselves.
+    var greedyCasks: Set<String> = []
+
+    /// The names of the entries that have an update, by each entry's kind,
+    /// so a formula and a cask that share a name are told apart.
+    func names(for entries: [BrewfileEntry]) -> Set<String> {
+        Set(entries.filter(isOutdated).map(\.name))
+    }
+
+    func isOutdated(_ entry: BrewfileEntry) -> Bool {
+        switch entry.kind {
+        case .formula: return formulae.contains(entry.name)
+        case .cask:    return casks.contains(entry.name)
+                           || (entry.isGreedy && greedyCasks.contains(entry.name))
+        case .tap:     return false
+        }
+    }
+
+    /// The formula and cask names in `brew outdated --json=v2`'s output,
+    /// or nil when it is not that JSON.
+    static func names(fromJSON json: String) -> (formulae: Set<String>, casks: Set<String>)? {
+        guard let data = json.data(using: .utf8),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let formulae = root["formulae"] as? [[String: Any]],
+              let casks = root["casks"] as? [[String: Any]]
+        else { return nil }
+        return (Set(formulae.compactMap { $0["name"] as? String }),
+                Set(casks.compactMap { $0["name"] as? String }))
     }
 }
 
