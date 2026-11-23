@@ -304,6 +304,53 @@ struct BrewfileViewModelAddRemoveTests {
     }
 }
 
+// MARK: - BrewOutdated
+
+@Suite("BrewOutdated")
+struct BrewOutdatedTests {
+
+    private func entries(_ brewfile: String) -> [BrewfileEntry] {
+        BrewfileParser.entries(from: BrewfileParser.parse(string: brewfile))
+    }
+
+    @Test("A cask whose app updates itself counts only when its line has greedy: true")
+    func greedyCasks() {
+        // nordvpn and zoom update themselves: brew lists them under --greedy alone.
+        let outdated = BrewOutdated(formulae: ["jq"],
+                                    casks: ["firefox"],
+                                    greedyCasks: ["firefox", "nordvpn", "zoom"])
+        let names = outdated.names(for: entries("""
+        brew "jq"
+        brew "git"
+        cask "firefox"
+        cask "nordvpn", greedy: true
+        cask "zoom"
+        tap "homebrew/cask"
+        """))
+        #expect(names == ["jq", "firefox", "nordvpn"])
+    }
+
+    @Test("A formula and a cask that share a name are told apart")
+    func byKind() {
+        let outdated = BrewOutdated(formulae: [], casks: ["git"], greedyCasks: ["git"])
+        let found = entries("brew \"git\"\ncask \"git\"\n").filter(outdated.isOutdated)
+        #expect(found.map(\.id) == ["cask:git"])
+    }
+
+    @Test("Reads brew outdated --json=v2 and refuses anything else")
+    func parsesJSON() throws {
+        let json = """
+        {"formulae":[{"name":"jq","installed_versions":["1.7"],"current_version":"1.8"}],
+         "casks":[{"name":"gcloud-cli","installed_versions":["594.0.0"],"current_version":"594.0.1"}]}
+        """
+        let names = try #require(BrewOutdated.names(fromJSON: json))
+        #expect(names.formulae == ["jq"])
+        #expect(names.casks == ["gcloud-cli"])
+        #expect(BrewOutdated.names(fromJSON: "Error: no network") == nil)
+        #expect(BrewOutdated.names(fromJSON: "[]") == nil)
+    }
+}
+
 // MARK: - Version comparison
 
 @Suite("Version comparison")

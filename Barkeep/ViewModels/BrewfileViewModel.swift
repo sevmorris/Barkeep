@@ -11,6 +11,8 @@ final class BrewfileViewModel {
     var isLoadingDetail = false
     var filterText = ""
     var outdatedNames: Set<String> = []
+    /// What `brew outdated` last reported; `outdatedNames` is drawn from it.
+    var outdated = BrewOutdated()
     var activeTaps: Set<String> = []
 
     /// Asked before every write: a reason to hold it back, or nil. In mrk
@@ -85,11 +87,12 @@ final class BrewfileViewModel {
         Task { await refreshTaps() }
     }
 
-    /// Refresh outdated names, filtered to Brewfile entries only.
+    /// Refresh outdated names, filtered to Brewfile entries only. A cask
+    /// whose app updates itself counts when its line has `greedy: true`
+    /// (`BrewOutdated`).
     func refreshOutdated() async {
-        let allOutdated = await BrewRunner.shared.outdatedNames()
-        let brewfileNames = Set(allEntries.map(\.name))
-        outdatedNames = allOutdated.intersection(brewfileNames)
+        outdated = await BrewRunner.shared.outdated()
+        outdatedNames = outdated.names(for: allEntries)
     }
 
     /// Refresh the set of currently active taps so the action panel can
@@ -137,6 +140,9 @@ final class BrewfileViewModel {
             pkg.tldrSummary           = tldrResult.summary
             pkg.manSections           = manResult
             pkg.reverseDependencies   = usesResult
+            // brew info's `outdated` leaves out a cask whose app updates
+            // itself, which a greedy: true line counts.
+            pkg.outdated              = pkg.outdated || outdated.isOutdated(entry)
             selectedDetail = pkg
         }
         isLoadingDetail = false

@@ -74,6 +74,7 @@ struct HelpView: View {
                 section("Notes") {
                     text("Barkeep writes your Brewfile in-place using atomic replacement. All comments, blank lines, and section headers are preserved verbatim.")
                     text("A cask Barkeep adds gets greedy: true when most of the Brewfile's casks already have it, so it matches the rest of the file.")
+                    text("A cask whose app updates itself shows an update only when its line has greedy: true, as brew upgrade and brew bundle treat it. Without it, the app is left to update itself.")
                     text("tldr examples require the tldr command-line tool to be installed (brew install tldr).")
                 }
             }
